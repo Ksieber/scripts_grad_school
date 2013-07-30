@@ -47,23 +47,29 @@ my $results = GetOptions (\%options,
 		'taxon_dir=s',
 		'taxon_idx_dir=s',
 		'path_to_blastdb=s',
+		'clovr=s',
+		'diag=s',
+		'fs=s',
 		'help|h'
 		);
 
 if($options{help}){die "Help: This script will takes a bam and identifies bacterial human LGT.
-	    --input_bam=			<BAM>
+		--input_bam=				<BAM>
 		--decrypt= 				[0] (0|1)
 		--url=
 		--split_bac_list=
 		--hg19_ref=
-        --refseq_list=
+        	--refseq_list=
 		--output_dir=
 		--bin_dir=
-		--threads
+		--threads=				[1] # of CPU's to use for hyperthreading BWA. 
 		--taxon_host=
 		--taxon_dir=
 		--taxon_idx_dir=
 		--path_to_blastdb=
+		--clovr=				<0|1> [0] 1=Use clovr defaults for file paths 
+		--diag=					<0|1> [0] 1=Use diag node defaults for file paths 
+		--fs=					<0|1> [0] 1=Use filesystem defaults for file paths 
 		--help\n";
 }
 
@@ -71,22 +77,15 @@ if(!$options{input_bam}){die "Error: Please give an input.bam with --input_bam=<
 if($options{decrypt} == 1 && !$options{url}){die "Error: Must give a --url to use --decrypt.\n";}
 
 # Take care of the inputs
+## Setup Default paths for references and bins:
+setup_defaults();
 my $bin_dir = $options{bin_dir} ? $options{bin_dir} : '/opt/lgtseek/bin/';    
 my $ergatis_dir = $options{ergatis_dir} ? $options{ergatis_dir} :'/opt/ergatis/bin/';
 my $prinseq_bin = $options{prinseq_bin} ? $options{prinseq_bin} : '/opt/prinseq/bin/';
 my $samtools_bin = $options{samtools_bin} ? $options{samtools_bin} : 'samtools';
 my $threads = $options{threads} ? $options{threads} : 1;
 
-## Below "if" statements are temp?
-if(!$options{split_bac_list}){$options{split_bac_list}="/mnt/staging/data/lgt_seq/mnt/references/split_refseq_bacteria/split_bacteria_ref.list";}
-if(!$options{hg19_ref}){$options{hg19_ref}="/mnt/staging/data/lgt_seq/mnt/references/hg19/dna/hg19.fa";}
-if(!$options{refseq_list}){$options{refseq_list}="/mnt/staging/data/lgt_seq/mnt/references/refseq_bacteria_BWA_INDEXED_20110831/refseq.list";}
-if(!$options{taxon_host}){$options{taxon_host}="cloud-128-152.diagcomputing.org:10001";}
-if(!$options{taxon_dir}){$options{taxon_dir}="/mnt/references/taxonomy";}
-if(!$options{taxon_idx_dir}){$options{taxon_idx_dir}="/mnt/references/taxonomy";}
-if(!$options{path_to_blastdb}){$options{path_to_blastdb}="/mnt/scratch/ksieber/ref/refseq_bacteria_merged.fna";}  ## FIX this
-if(!$options{donor_lineage}){$options{donor_lineage}="Bacteria";}
-if(!$options{host_lineage}){$options{host_lineage}="Eukaryota";}	
+
 
 # Create an lgtseek object
 my $lgtseek = LGTSeek->new({
@@ -192,7 +191,7 @@ print STDERR `mkdir -p $options{output_dir}/blast_validation`;
 
 my $lgt_fasta = $lgtseek->sam2Fasta({
 		input => "$options{output_dir}\/$name\_lgt_donor.bam"
-		});
+});
 
 # Blast & get best hits
 print STDERR "=====BESTBLAST2=====\n";
@@ -202,7 +201,7 @@ my $best_blasts = $lgtseek->bestBlast2({
 		lineage2 => $options{host_lineage},
 		fasta => $lgt_fasta,
 		output_dir => "$options{output_dir}/blast_validation/"
-		});
+});
 
 # Now run lgtfinder
 print STDERR "=====LGTFINDER=====\n";
@@ -212,7 +211,7 @@ my $valid_lgts = $lgtseek->runLgtFinder({
 		input_file_list => $best_blasts->{list_file},
 		output_prefix => "$name",
 		output_dir => "$options{output_dir}/blast_validation",
-		});
+});
 
 # Run blast and keep raw output ?
 `blastall -p blastn -e 10e-5 -T F -d $options{path_to_blastdb} -i $lgt_fasta > $options{output_dir}/blast_validation/$name\_blast.raw`;
@@ -228,6 +227,64 @@ $lgtseek->runBWA({
 		cleanup_sai => 1,
 		run_lca => 1,
 		overwrite => 0,
-		}); 
+}); 
 
+
+sub setup_defaults {
+## Default file Path prefixes
+	my $diag = 
+	{
+		bin_dir => "/opt/lgtseek/bin/",
+		ergatis_bin => "/opt/ergatis/bin/",
+		prinseq_bin => "/opt/prinseq/bin/",
+		samtools_bin => "samtools",
+		split_bac_list => "/mnt/staging/data/lgt_seq/mnt/references/split_refseq_bacteria/split_bacteria_ref.list",
+		hg19_ref => "/mnt/staging/data/lgt_seq/mnt/references/hg19/dna/hg19.fa",
+		refseq_list => "/mnt/staging/data/lgt_seq/mnt/references/refseq_bacteria_BWA_INDEXED_20110831/refseq.list",
+		taxon_host => "cloud-128-152.diagcomputing.org:10001",
+		taxon_dir => "/mnt/staging/data/lgt_seq/mnt/references/taxonomy",
+		taxon_idx_dir => "/mnt/staging/data/lgt_seq/mnt/references/taxonomy",
+		path_to_blastdb => "/mnt/scratch/ksieber/ref/refseq_bacteria_merged.fna",  ## FIX this
+		donor_lineage => "Bacteria",
+		host_lineage => "Eukaryota"
+	};
+	
+	my $clovr = 
+	{
+		bin_dir => "/opt/lgtseek/bin/",
+		ergatis_bin => "/opt/ergatis/bin/",
+		prinseq_bin => "/opt/prinseq/bin/",
+		samtools_bin => "samtools",
+		split_bac_list => "/mnt/references/split_refseq_bacteria/split_bacteria_ref.list",
+		hg19_ref => "/mnt/references/hg19/dna/hg19.fa",
+		refseq_list => "/mnt/references/refseq_bacteria_BWA_INDEXED_20110831/refseq.list",
+		taxon_host => "cloud-128-152.diagcomputing.org:10001",						## FIX this
+		taxon_dir => "/mnt/references/taxonomy",
+		taxon_idx_dir => "/mnt/references/taxonomy",
+		path_to_blastdb => "/mnt/scratch/ksieber/ref/refseq_bacteria_merged.fna",  ## FIX this
+		donor_lineage => "Bacteria",
+		host_lineage => "Eukaryota"
+	};
+
+	my $fs = 
+	{
+		bin_dir => "/local/projects-t3/HLGT/scripts/lgtseek-master/lib/",
+		ergatis_bin => "/local/projects/ergatis/package-driley/bin/",
+		prinseq_bin => "/home/ksieber/scripts/prinseq-lite-0.18.1/",
+		samtools_bin => "samtools",
+		split_bac_list => "/local/projects-t3/HLGT/references/split_bacteria/all_bacteria.list",
+		hg19_ref => "/local/projects-t3/HLGT/references/hg19/hg19.fa",
+		refseq_list => "/local/projects-t3/HLGT/references/refseq_bacteria_BWA_INDEXED_20110831/refseq.list",
+		taxon_host => "cloud-128-152.diagcomputing.org:10001",
+		taxon_dir => "/local/projects-t3/HLGT/references/taxonomy",
+		taxon_idx_dir => "/local/projects-t3/HLGT/references/taxonomy",
+		path_to_blastdb => "/local/db/ncbi/blast/db/nt",  ## FIX this
+		donor_lineage => "Bacteria",
+		host_lineage => "Eukaryota"
+	};
+	
+	if($options{clovr}==1){foreach my $keys (keys %$clovr){$options{$keys}=$clovr->{$keys};}}
+	if($options{diag}==1){foreach my $keys (keys %$diag){$options{$keys}=$diag->{$keys};}}			
+	if($options{fs}==1){foreach my $keys (keys %$fs){$options{$keys}=$fs->{$keys};}}
+}
 
