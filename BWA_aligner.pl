@@ -1,6 +1,7 @@
 #!/usr/local/bin/perl
 use strict;
 use File::Basename;
+use lib '/home/ksieber/scripts/';
 use run_cmd;
 use setup_input;
 use setup_output;
