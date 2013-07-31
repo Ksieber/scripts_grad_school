@@ -23,7 +23,7 @@ Internal methods are usually preceded with a _
 =cut
 
 use strict;
-use lib '/local/projects-t3/HLGT/scripts/lgtseek-master/lib/';      ### May need to change this depending on where the script is being run
+use lib '/local/projects-t3/HLGT/scripts/lgtseek/lib/';      ### May need to change this depending on where the script is being run
 use LGTSeek;
 use File::Basename;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
@@ -38,7 +38,7 @@ my $results = GetOptions (\%options,
 		'output_dir=s',
 		'bin_dir=s',
 		'samtools_bin=s',
-		'ergatis_dir=s',
+		'ergatis_bin=s',
 		'prinseq_bin=s',
 		'donor_lineage=s',
 		'host_lineage=s',
@@ -80,7 +80,7 @@ if($options{decrypt} == 1 && !$options{url}){die "Error: Must give a --url to us
 ## Setup Default paths for references and bins:
 setup_defaults();
 my $bin_dir = $options{bin_dir} ? $options{bin_dir} : '/opt/lgtseek/bin/';    
-my $ergatis_dir = $options{ergatis_dir} ? $options{ergatis_dir} :'/opt/ergatis/bin/';
+my $ergatis_dir = $options{ergatis_bin} ? $options{ergatis_bin} :'/opt/ergatis/bin/';
 my $prinseq_bin = $options{prinseq_bin} ? $options{prinseq_bin} : '/opt/prinseq/bin/';
 my $samtools_bin = $options{samtools_bin} ? $options{samtools_bin} : 'samtools';
 my $threads = $options{threads} ? $options{threads} : 1;
@@ -97,7 +97,7 @@ my $lgtseek = LGTSeek->new({
 		taxon_host => $options{taxon_host},
 		taxon_dir => $options{taxon_dir},
 		taxon_idx_dir => $options{taxon_idx_dir}
-		});
+});
 
 my ($name,$path,$suf)=fileparse($options{input_bam},".bam");
 chomp $name;
@@ -124,7 +124,7 @@ my $donor_bams = $lgtseek->runBWA({
 		reference_list => $options{split_bac_list},
 		overwrite => 0,   
 		cleanup_sai => 1,
-		});
+});
 
 
 # Align to the hosts.
@@ -137,7 +137,7 @@ my $host_bams = $lgtseek->runBWA({
 		reference => $options{hg19_ref},
 		overwrite => 0, 
 		cleanup_sai => 1,   
-		});
+});
 
 
 # Postprocess the results
@@ -147,7 +147,7 @@ my $pp_data = $lgtseek->bwaPostProcess({
 		host_bams => $host_bams,
 		output_prefix => $name,
 		overwrite => 0,   
-		});
+});
 
 # Clean up output we don't need anymore
 #print STDERR "Removing the raw donor/host mappings\n";
@@ -210,7 +210,7 @@ my $valid_lgts = $lgtseek->runLgtFinder({
 		lineage2 => $options{host_lineage},
 		input_file_list => $best_blasts->{list_file},
 		output_prefix => "$name",
-		output_dir => "$options{output_dir}/blast_validation",
+		output_dir => "$options{output_dir}/lgt_finder/",
 });
 
 # Run blast and keep raw output ?
@@ -259,8 +259,8 @@ sub setup_defaults {
 		hg19_ref => "/mnt/references/hg19/dna/hg19.fa",
 		refseq_list => "/mnt/references/refseq_bacteria_BWA_INDEXED_20110831/refseq.list",
 		taxon_host => "cloud-128-152.diagcomputing.org:10001",						## FIX this
-		taxon_dir => "/mnt/references/taxonomy",
-		taxon_idx_dir => "/mnt/references/taxonomy",
+		taxon_dir => "/mnt/references/taxonomy/20120720_135302/",
+		taxon_idx_dir => "/mnt/references/taxonomy/20120720_135302/",
 		path_to_blastdb => "/mnt/scratch/ksieber/ref/refseq_bacteria_merged.fna",  ## FIX this
 		donor_lineage => "Bacteria",
 		host_lineage => "Eukaryota"
@@ -268,16 +268,16 @@ sub setup_defaults {
 
 	my $fs = 
 	{
-		bin_dir => "/local/projects-t3/HLGT/scripts/lgtseek-master/lib/",
+		bin_dir => "/local/projects-t3/HLGT/scripts/lgtseek/bin/",
 		ergatis_bin => "/local/projects/ergatis/package-driley/bin/",
-		prinseq_bin => "/home/ksieber/scripts/prinseq-lite-0.18.1/",
+		prinseq_bin => "/home/ksieber/lib/prinseq-lite-0.18.1/",
 		samtools_bin => "samtools",
 		split_bac_list => "/local/projects-t3/HLGT/references/split_bacteria/all_bacteria.list",
 		hg19_ref => "/local/projects-t3/HLGT/references/hg19/hg19.fa",
 		refseq_list => "/local/projects-t3/HLGT/references/refseq_bacteria_BWA_INDEXED_20110831/refseq.list",
-		taxon_host => "cloud-128-152.diagcomputing.org:10001",
-		taxon_dir => "/local/projects-t3/HLGT/references/taxonomy",
-		taxon_idx_dir => "/local/projects-t3/HLGT/references/taxonomy",
+		taxon_host => "mongotest1-lx.igs.umaryland.edu:10001",
+		taxon_dir => "/local/db/repository/ncbi/blast/20120414_001321/taxonomy/",
+		taxon_idx_dir => "/local/projects-t3/HLGT/idx_dir/20120414",
 		path_to_blastdb => "/local/db/ncbi/blast/db/nt",  ## FIX this
 		donor_lineage => "Bacteria",
 		host_lineage => "Eukaryota"
