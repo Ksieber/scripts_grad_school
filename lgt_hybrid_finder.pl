@@ -48,7 +48,7 @@ my $results = GetOptions (\%options,
 		);
 
 if($options{help}){die "Help: This script will takes a bam and identifies bacterial human LGT.
-		--input_bam=				<.bam or .fa>
+		--input=				<.bam or .fa>
 		--output_dir=				</dir/for/output/> [cwd]
 		--taxon_host=
 		--taxon_dir=
