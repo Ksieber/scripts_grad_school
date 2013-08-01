@@ -51,7 +51,7 @@ my $results = GetOptions (\%options,
 		'diag=s',
 		'fs=s',
 		'help|h'
-		);
+);
 
 if($options{help}){die "Help: This script will takes a bam and identifies bacterial human LGT.
 		--input_bam=				<BAM>
@@ -108,7 +108,7 @@ if($options{decrypt}==1){
 			input => $options{input_bam},
 			url => $options{url},
 			output_dir => $options{output_dir}
-			})
+	})
 } else {
 	$input_bam = $options{input_bam};
 }
@@ -170,7 +170,7 @@ print STDERR "=====PRINSEQ=====\n";
 my $filtered_bam = $lgtseek->prinseqFilterBam(
 		{output_dir => "$options{output_dir}/prinseq_filtering",
 		bam_file => $pp_data->{files}->{lgt_donor}}
-		);
+);
 
 # Add filtered count to counts.
 push(@header,'lgt_pass_prinseq_filter');
