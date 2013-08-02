@@ -59,7 +59,7 @@ if($options{help}){die "Help: This script will takes a bam and identifies bacter
 		--url=
 		--split_bac_list=
 		--hg19_ref=
-        	--refseq_list=
+        --refseq_list=
 		--output_dir=
 		--bin_dir=
 		--threads=				[1] # of CPU's to use for hyperthreading BWA. 
@@ -79,6 +79,8 @@ if($options{decrypt} == 1 && !$options{url}){die "Error: Must give a --url to us
 # Take care of the inputs
 ## Setup Default paths for references and bins:
 setup_defaults();
+
+## These are only set to : <X> if --options{y} isn't used OR --clovr/diag/fs=1
 my $bin_dir = $options{bin_dir} ? $options{bin_dir} : '/opt/lgtseek/bin/';    
 my $ergatis_dir = $options{ergatis_bin} ? $options{ergatis_bin} :'/opt/ergatis/bin/';
 my $prinseq_bin = $options{prinseq_bin} ? $options{prinseq_bin} : '/opt/prinseq/bin/';
@@ -217,16 +219,29 @@ my $valid_lgts = $lgtseek->runLgtFinder({
 `blastall -p blastn -e 10e-5 -T F -d $options{path_to_blastdb} -i $lgt_fasta > $options{output_dir}/blast_validation/$name\_blast.raw`;
 
 # Calculate BWA LCA's for LGTs
-print STDERR "=====BWA-LCA=====\n";
-print STDERR `mkdir -p $options{output_dir}/LGT_LCA-BWA`;
+print STDERR "=====LGT-BWA-LCA=====\n";
+print STDERR `mkdir -p $options{output_dir}/lgt_lca-bwa`;
 $lgtseek->runBWA({
 		input_bam => "$options{output_dir}\/$name\_lgt_donor.bam",
-		output_dir => "$options{output_dir}\/LGT_LCA-BWA/",
-		out_file => "$options{output_dir}/$name\_LCA-BWA.txt",
+		output_dir => "$options{output_dir}\/lgt_lca-bwa/",
+		out_file => "$options{output_dir}\/lgt_lca-bwa\/$name\_lgt_lca-bwa.txt",
 		reference_list => "$options{refseq_list}",
-		cleanup_sai => 1,
 		run_lca => 1,
 		overwrite => 0,
+		cleanup_sai => 1,
+}); 
+
+# Calculate BWA LCA's for Microbiome Reads
+print STDERR "=====Microbiome-BWA-LCA=====\n";
+print STDERR `mkdir -p $options{output_dir}/microbiome_lca-bwa`;
+$lgtseek->runBWA({
+		input_bam => "$options{output_dir}\/$name\_microbiome.bam",
+		output_dir => "$options{output_dir}\/microbiome_lca-bwa/",
+		out_file => "$options{output_dir}\/microbiome_lca-bwa\/$name\_lgt_lca-bwa.txt",
+		reference_list => "$options{refseq_list}",
+		run_lca => 1,
+		overwrite => 0,
+		cleanup_sai => 1,
 }); 
 
 
