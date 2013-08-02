@@ -9,14 +9,14 @@ our $results = GetOptions (\%options,
 		'input=s',
 		'input_list=s',
 		'output_dir=s',
-      'subdirs',
+      'subdirs=s',
 		'password=s',
       'test_print',
 		'help',
 );
 
 if($options{help}){die
-	"Help: This script will decrypt TCGA data. 
+	"Help: This script will decrypt SRA data (.ncbi_enc)
 	--input=
 	--input_list=
 	--output_dir=		[cwd]
