@@ -23,7 +23,7 @@ Internal methods are usually preceded with a _
 =cut
 
 use strict;
-use lib '/local/projects-t3/HLGT/scripts/lgtseek/lib/';      ### May need to change this depending on where the script is being run
+use lib qw(/local/projects-t3/HLGT/scripts/lgtseek/lib/ /opt/lgtseek/lib/);      ### May need to change this depending on where the script is being run
 use LGTSeek;
 use File::Basename;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
@@ -259,7 +259,7 @@ sub setup_defaults {
 		taxon_host => "cloud-128-152.diagcomputing.org:10001",
 		taxon_dir => "/mnt/staging/data/lgt_seq/mnt/references/taxonomy",
 		taxon_idx_dir => "/mnt/staging/data/lgt_seq/mnt/references/taxonomy",
-		path_to_blastdb => "/mnt/scratch/ksieber/ref/refseq_bacteria_merged.fna",  ## FIX this
+		path_to_blastdb => "/mnt/staging/data/ncbi-nt/nt",
 		donor_lineage => "Bacteria",
 		host_lineage => "Eukaryota"
 	};
