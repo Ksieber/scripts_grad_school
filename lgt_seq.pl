@@ -27,6 +27,7 @@ use lib qw(/local/projects-t3/HLGT/scripts/lgtseek/lib/ /opt/lgtseek/lib/);     
 use LGTSeek;
 use File::Basename;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
+use setup_default_paths;
 my %options;
 my $results = GetOptions (\%options,
 		'input_bam=s', # Comma separated list of files
@@ -76,9 +77,10 @@ if($options{help}){die "Help: This script will takes a bam and identifies bacter
 if(!$options{input_bam}){die "Error: Please give an input.bam with --input_bam=<FILE>. Try again or use --help.\n";}
 if($options{decrypt} == 1 && !$options{url}){die "Error: Must give a --url to use --decrypt.\n";}
 
+
 # Take care of the inputs
 ## Setup Default paths for references and bins:
-setup_defaults();
+setup_default_paths();
 
 ## These are only set to : <X> if --options{y} isn't used OR --clovr/diag/fs=1
 my $bin_dir = $options{bin_dir} ? $options{bin_dir} : '/opt/lgtseek/bin/';    
@@ -244,6 +246,7 @@ $lgtseek->runBWA({
 		cleanup_sai => 1,
 }); 
 
+__END__
 
 sub setup_defaults {
 ## Default file Path prefixes
