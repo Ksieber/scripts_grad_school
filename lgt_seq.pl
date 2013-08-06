@@ -191,10 +191,9 @@ sub print_tab {
 }
 
 # Make LGT Fasta for Blast validation
-print STDERR `mkdir -p $options{output_dir}/blast_validation`;
-
 my $lgt_fasta = $lgtseek->sam2Fasta({
-		input => "$options{output_dir}\/$name\_lgt_donor.bam"
+		input => "$options{output_dir}\/$name\_lgt_donor.bam",
+		output_dir => "$options{output_dir}/blast_validation/"
 });
 
 # Blast & get best hits
