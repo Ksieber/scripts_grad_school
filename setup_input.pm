@@ -13,7 +13,7 @@ sub setup_input {
    our %options;
    our $results;
    if(!$main::options{input} && !$main::options{input_list}){ die
-       "Error: setup_input.pm requires either $options{input} or $options{input_list}.\n";
+       "Error: setup_input.pm requires either \$options{input} or \$options{input_list}.\n";
    }
    if($main::options{input}){
        push(@inputList,$main::options{input});

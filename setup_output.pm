@@ -1,6 +1,5 @@
 package setup_output;
 use strict;
-use warnings;
 use File::Basename;
 use Exporter;
 our @ISA = qw(Exporter);

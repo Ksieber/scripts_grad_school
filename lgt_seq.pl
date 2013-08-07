@@ -28,15 +28,16 @@ use LGTSeek;
 use File::Basename;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 use setup_default_paths;
-my %options;
-my $results = GetOptions (\%options,
-		'input_bam=s', # Comma separated list of files
+our %options;
+our $results = GetOptions (\%options,
+		'input=s', # Comma separated list of files
 		'decrypt=s',
 		'url=s',
 		'split_bac_list=s',
 		'hg19_ref=s',
         'refseq_list=s',
 		'output_dir=s',
+		'lgt_coverage=s',
 		'bin_dir=s',
 		'samtools_bin=s',
 		'ergatis_bin=s',
@@ -55,13 +56,14 @@ my $results = GetOptions (\%options,
 );
 
 if($options{help}){die "Help: This script will takes a bam and identifies bacterial human LGT.
-		--input_bam=				<BAM>
+		--input=				<BAM>
 		--decrypt= 				[0] (0|1)
 		--url=
 		--split_bac_list=
 		--hg19_ref=
-        --refseq_list=
+        	--refseq_list=
 		--output_dir=
+		--lgt_coverage=				<0|1> [0] 1= Calculate coverage of hg19 LGT. 
 		--bin_dir=
 		--threads=				[1] # of CPU's to use for hyperthreading BWA. 
 		--taxon_host=
@@ -74,13 +76,13 @@ if($options{help}){die "Help: This script will takes a bam and identifies bacter
 		--help\n";
 }
 
-if(!$options{input_bam}){die "Error: Please give an input.bam with --input_bam=<FILE>. Try again or use --help.\n";}
+if(!$options{input}){die "Error: Please give an input.bam with --input=<FILE>. Try again or use --help.\n";}
 if($options{decrypt} == 1 && !$options{url}){die "Error: Must give a --url to use --decrypt.\n";}
 
 
 # Take care of the inputs
 ## Setup Default paths for references and bins:
-setup_default_paths();
+&setup_default_paths();
 
 ## These are only set to : <X> if --options{y} isn't used OR --clovr/diag/fs=1
 my $bin_dir = $options{bin_dir} ? $options{bin_dir} : '/opt/lgtseek/bin/';    
@@ -88,6 +90,7 @@ my $ergatis_dir = $options{ergatis_bin} ? $options{ergatis_bin} :'/opt/ergatis/b
 my $prinseq_bin = $options{prinseq_bin} ? $options{prinseq_bin} : '/opt/prinseq/bin/';
 my $samtools_bin = $options{samtools_bin} ? $options{samtools_bin} : 'samtools';
 my $threads = $options{threads} ? $options{threads} : 1;
+my $lgt_coverage = $options{lgt_coverage} ? $options{lgt_coverage} : "0";
 
 
 
@@ -103,18 +106,18 @@ my $lgtseek = LGTSeek->new({
 		taxon_idx_dir => $options{taxon_idx_dir}
 });
 
-my ($name,$path,$suf)=fileparse($options{input_bam},".bam");
+my ($name,$path,$suf)=fileparse($options{input},".bam");
 chomp $name;
 
 my $input_bam;
 if($options{decrypt}==1){
 	$input_bam = $lgtseek->decrypt({
-			input => $options{input_bam},
+			input => $options{input},
 			url => $options{url},
 			output_dir => $options{output_dir}
 	})
 } else {
-	$input_bam = $options{input_bam};
+	$input_bam = $options{input};
 }
 
 
@@ -244,6 +247,16 @@ $lgtseek->runBWA({
 		overwrite => 0,
 		cleanup_sai => 1,
 }); 
+
+if($lgt_coverage==1){
+	print STDERR "=====Calculating Coverage of Hg19 LGT======\n";
+	$lgtseek->mpileup({
+		input => "$options{output_dir}\/$name\_lgt_donor.bam",
+		output_dir => $options{output_dir},
+		ref => $options{hg19_ref},
+		cleanup => 1,
+	});
+}
 
 __END__
 

@@ -24,6 +24,7 @@ our $results = GetOptions (\%options,
                         'insert_metrics=s',
                         'mapped_only=s',
                         'cmd_log=s',
+                        'qsub=s',
                         'help|h',
 );
 
@@ -34,16 +35,17 @@ if ($options{help}) {die "\nHELP: This script will align the input (fastq/bam) t
 \t--ref_list=			List of References.
 \t--output_prefix=		Prefix for each output.  Ie. (SRA_LGT)_at_\$ref_name
 \t--output_dir=			Will output to current working directory unless another is specified with this. ie. /ksieber_dir/tmp/
-\t--subdirs=			<0|1> [0] 1=Make subdirectories for each input file to be mapped.
+\t--subdirs=			<0|1> [0] 1= Make subdirectories for each input file to be mapped.
 \t--t=				<#>   [1] Set the number of cpu threads to use for bwa aln steps. USE CAREFULLY.   
-\t--disable_SW=			<0|1> [0] 1=Disable Smith-Waterman for the UM mate. Ideal for quicker LGT mappings IF they are high confidence. 
-\t--mapped_only=			<0|1> [0] 1=Only keep mates with 1 mapped read.
+\t--disable_SW=			<0|1> [0] 1= Disable Smith-Waterman for the UM mate. Ideal for quicker LGT mappings IF they are high confidence. 
+\t--mapped_only=			<0|1> [0] 1= Only keep mates with 1 mapped read.
 \t--sam_output=			<0|1> [0] 0=.bam output; 1=.sam output
 \t--sort_index_bams=		<0|1> [0] 1=Sort and index the new.bam into new.srt.bam and new.srt.bai. 
-\t--mpileup=			<0|1> [0] 1=Calculate pileup coverage on .bam.
-\t--no_cleanup=			<0|1> [0] 0=Removes .sai files and unsorted.bam with --sort_index_bams. 1=No deleting intermediate data. 
+\t--mpileup=			<0|1> [0] 1= Calculate pileup coverage on .bam.
+\t--no_cleanup=			<0|1> [0] 0= Removes .sai files and unsorted.bam with --sort_index_bams. 1=No deleting intermediate data. 
 \t--insert_metrics=		<0|1> [0] 1= Use Picard to calculate insert size metrics.
 \t--cmd_log=			<0|1> [0] 1= Log all commands run in each output_dir/output_prefix.cmd_log
+\t--qsub=				<0|1> [0] 1= qsub each input mapping at each reference. Use CAREFULLY. NOT IMPLEMENTED YET!!!
 \t--help\n";
 }
 
@@ -97,7 +99,8 @@ if ($options{cmd_log}==1) {
 ## Run BWA
 foreach my $files (@$input){
 	foreach my $refs (@ref_list){
-		bwa_align($files,$refs);
+			bwa_align($files,$refs);
+		}
 	}
 }
 
