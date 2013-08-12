@@ -6,12 +6,12 @@ our @ISA = qw(Exporter);
 our @EXPORT = qw( wc );
 
 sub wc {
-   my $file = $_[0];
+   my $file = shift;
    my $count=`wc -l $file`;
    $count=~/^(\d+)\s+/;
    my $num=$1;
-   if($num!~/\d+/){
-      print STDERR "Warning: The file didn't have any lines?\n";
+   if($num==0){
+      print STDERR "Warning: The file is empty. File:$file\tLines:$num\n";
    }
    return "$num";
 }

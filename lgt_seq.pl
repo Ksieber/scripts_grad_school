@@ -11,7 +11,7 @@ Search an hg19.bam against human and bacteria for LGT.
 =head1 DESCRIPTION
 
 
-=head1 AUTHOR - Karsten B. Sieber
+=head1 AUTHORS - Karsten Sieber & David Riley
 
 e-mail: ksieber@som.umaryland.edu
 
@@ -21,7 +21,7 @@ The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with a _
 
 =cut
-
+use warnings;
 use strict;
 use lib qw(/local/projects-t3/HLGT/scripts/lgtseek/lib/ /opt/lgtseek/lib/);      ### May need to change this depending on where the script is being run
 use LGTSeek;
@@ -33,6 +33,7 @@ our $results = GetOptions (\%options,
 		'input=s', # Comma separated list of files
 		'decrypt=s',
 		'url=s',
+		'prelim_filter=s',
 		'split_bac_list=s',
 		'hg19_ref=s',
         'refseq_list=s',
@@ -57,8 +58,9 @@ our $results = GetOptions (\%options,
 
 if($options{help}){die "Help: This script will takes a bam and identifies bacterial human LGT.
 		--input=				<BAM>
-		--decrypt= 				[0] (0|1)
+		--decrypt= 				<0|1> [0]
 		--url=
+		--prelim_filter			<0|1> [0] 1=Filter out human M_M reads from original input.
 		--split_bac_list=
 		--hg19_ref=
         	--refseq_list=
@@ -77,7 +79,8 @@ if($options{help}){die "Help: This script will takes a bam and identifies bacter
 }
 
 if(!$options{input}){die "Error: Please give an input.bam with --input=<FILE>. Try again or use --help.\n";}
-if($options{decrypt} == 1 && !$options{url}){die "Error: Must give a --url to use --decrypt.\n";}
+if(!$options{output_dir}){print "It is HIGHLY recommended you STOP, restart, and use a --output_dir=<some/where/>.\n";sleep 60;}
+
 
 
 # Take care of the inputs
@@ -91,8 +94,13 @@ my $prinseq_bin = $options{prinseq_bin} ? $options{prinseq_bin} : '/opt/prinseq/
 my $samtools_bin = $options{samtools_bin} ? $options{samtools_bin} : 'samtools';
 my $threads = $options{threads} ? $options{threads} : 1;
 my $lgt_coverage = $options{lgt_coverage} ? $options{lgt_coverage} : "0";
+my $decrypt = $options{decrypt} ? $options{decrypt} : "0";
+my $prelim_filter = $options{prelim_filter} ? $options{prelim_filter} : "0";
+if($decrypt == 1 && !$options{url}){die "Error: Must give a --url to use --decrypt.\n";}
 
-
+my ($name,$path,$suf)=fileparse($options{input},('.gpg.bam','_prelim.bam','.bam'));
+chomp $name;
+if(!$options{output_dir}){$options{output_dir}="$path/lgtseq/";}
 
 # Create an lgtseek object
 my $lgtseek = LGTSeek->new({
@@ -106,19 +114,27 @@ my $lgtseek = LGTSeek->new({
 		taxon_idx_dir => $options{taxon_idx_dir}
 });
 
-my ($name,$path,$suf)=fileparse($options{input},".bam");
-chomp $name;
-
+## Get input ready for processing with decryption and/or prelim filtering
+print STDERR "=====PREP-INPUT=====\n";
 my $input_bam;
-if($options{decrypt}==1){
+if($decrypt==1){
 	$input_bam = $lgtseek->decrypt({
 			input => $options{input},
 			url => $options{url},
 			output_dir => $options{output_dir}
 	})
-} else {
-	$input_bam = $options{input};
-}
+} elsif($prelim_filter==1){
+	my $unfiltered_bam;
+	if ($decrypt==1) {$unfiltered_bam = $input_bam;} 
+	else {$unfiltered_bam = $options{input};}
+	$input_bam = $lgtseek->prelim_filter({
+			input_bam => $unfiltered_bam,
+			output_dir => "$options{output_dir}/prelim_filter/",
+			keep_softclip => 1,
+			overwrite => 0,
+	});
+} else {$input_bam = $options{input};}
+
 
 
 # Align to the donors.
@@ -172,11 +188,13 @@ map {
 } ('total','host','no_map','all_map','single_map','integration_site_host','integration_site_donor','microbiome','lgt');
 &print_tab("$options{output_dir}/$name\_post_processing.tab",\@header,\@vals);
 
+if($lgtseek->empty_chk({input => $pp_data->{files}->{lgt_donor}})==1){die "No LGT in: $pp_data->{files}->{lgt_donor}\nStopping lgt_seq.\n"}
+
 # Prinseq filter the putative lgts
 print STDERR "=====PRINSEQ=====\n";
 my $filtered_bam = $lgtseek->prinseqFilterBam(
 		{output_dir => "$options{output_dir}/prinseq_filtering",
-		bam_file => $pp_data->{files}->{lgt_donor}}
+		input_bam => $pp_data->{files}->{lgt_donor}}
 );
 
 # Add filtered count to counts.
@@ -255,8 +273,11 @@ if($lgt_coverage==1){
 		output_dir => $options{output_dir},
 		ref => $options{hg19_ref},
 		cleanup => 1,
+		overwrite => 0,
 	});
 }
+
+print STDERR "Completed lgt_seq.pl on $options{input}\n";
 
 __END__
 
