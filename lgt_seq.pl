@@ -27,9 +27,8 @@ use lib qw(/local/projects-t3/HLGT/scripts/lgtseek/lib/ /opt/lgtseek/lib/);     
 use LGTSeek;
 use File::Basename;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
-use setup_default_paths;
-our %options;
-our $results = GetOptions (\%options,
+my %options;
+my $results = GetOptions (\%options,
 		'input=s', # Comma separated list of files
 		'decrypt=s',
 		'url=s',
@@ -80,18 +79,6 @@ if($options{help}){die "Help: This script will takes a bam and identifies bacter
 
 if(!$options{input}){die "Error: Please give an input.bam with --input=<FILE>. Try again or use --help.\n";}
 if(!$options{output_dir}){print "It is HIGHLY recommended you STOP, restart, and use a --output_dir=<some/where/>.\n";sleep 60;}
-
-
-
-# Take care of the inputs
-## Setup Default paths for references and bins:
-&setup_default_paths();
-
-## These are only set to : <X> if --options{y} isn't used OR --clovr/diag/fs=1
-my $bin_dir = $options{bin_dir} ? $options{bin_dir} : '/opt/lgtseek/bin/';    
-my $ergatis_dir = $options{ergatis_bin} ? $options{ergatis_bin} :'/opt/ergatis/bin/';
-my $prinseq_bin = $options{prinseq_bin} ? $options{prinseq_bin} : '/opt/prinseq/bin/';
-my $samtools_bin = $options{samtools_bin} ? $options{samtools_bin} : 'samtools';
 my $threads = $options{threads} ? $options{threads} : 1;
 my $lgt_coverage = $options{lgt_coverage} ? $options{lgt_coverage} : "0";
 my $decrypt = $options{decrypt} ? $options{decrypt} : "0";
@@ -102,20 +89,17 @@ my ($name,$path,$suf)=fileparse($options{input},('.gpg.bam','_prelim.bam','.bam'
 chomp $name;
 if(!$options{output_dir}){$options{output_dir}="$path/lgtseq/";}
 
-# Create an lgtseek object
-my $lgtseek = LGTSeek->new({
-		bin_dir => $bin_dir,
-		output_dir => $options{output_dir},
-		ergatis_bin => $ergatis_dir,
-		prinseq_bin => $prinseq_bin,
-		paired_end => 1,
-		taxon_host => $options{taxon_host},
-		taxon_dir => $options{taxon_dir},
-		taxon_idx_dir => $options{taxon_idx_dir}
+print STDERR "+++++++++++++++++++++++++++\n";
+print STDERR "++++++++  LGT-SEQ  ++++++++\n";
+print STDERR "+++++++++++++++++++++++++++\n\n";
+## Setup Default paths for references and bins:
+my $lgtseek = LGTSeek->new2({
+	options => \%options,
 });
 
+
 ## Get input ready for processing with decryption and/or prelim filtering
-print STDERR "=====PREP-INPUT=====\n";
+print STDERR "=========PREP-INPUT========\n";
 my $input_bam;
 if($decrypt==1){
 	$input_bam = $lgtseek->decrypt({
@@ -134,11 +118,11 @@ if($decrypt==1){
 			overwrite => 0,
 	});
 } else {$input_bam = $options{input};}
-print STDERR "=====INPUT-READY=====\n";
+print STDERR "=========INPUT-READY=======\n";
 
-
+__END__
 # Align to the donors.
-print STDERR "=====RUNBWA-DONOR=====\n";
+print STDERR "========RUNBWA-DONOR========\n";
 my $donor_bams = $lgtseek->runBWA({
 		input_bam => $input_bam,
 		output_bam => 1,
@@ -151,7 +135,7 @@ my $donor_bams = $lgtseek->runBWA({
 
 
 # Align to the hosts.
-print STDERR "=====RUNBWA-HOST=====\n";
+print STDERR "========RUNBWA-HOST========\n";
 my $host_bams = $lgtseek->runBWA({
 		input_bam => $input_bam,
 		output_bam => 1,
@@ -164,7 +148,7 @@ my $host_bams = $lgtseek->runBWA({
 
 
 # Postprocess the results
-print STDERR "=====POSTPROCESS=====\n";
+print STDERR "=======POSTPROCESS=======\n";
 my $pp_data = $lgtseek->bwaPostProcess({
 		donor_bams => $donor_bams,
 		host_bams => $host_bams,
@@ -190,12 +174,12 @@ map {
 
 
 ## Check to make sure we found LGT.
-print STDERR "=====LGT=====\n";
+print STDERR "========LGT========\n";
 if($lgtseek->empty_chk({input => $pp_data->{files}->{lgt_donor}})==1){
 	print STDERR "No LGT in: $pp_data->{files}->{lgt_donor}\. Skipping LGT LCA calculation and blast validation.\n";
 } else {
 	# Prinseq filter the putative lgts
-	print STDERR "=====LGT-PRINSEQ=====\n";
+	print STDERR "=======LGT-PRINSEQ=======\n";
 	my $filtered_bam = $lgtseek->prinseqFilterBam(
 		{output_dir => "$options{output_dir}/lgt_prinseq_filtering",
 		input_bam => $pp_data->{files}->{lgt_host}}
@@ -207,7 +191,7 @@ if($lgtseek->empty_chk({input => $pp_data->{files}->{lgt_donor}})==1){
 	&print_tab("$options{output_dir}/$name\_post_processing.tab",\@header,\@vals);
 
 	# Calculate BWA LCA's for LGTs
-	print STDERR "=====LGT-BWA-LCA=====\n";
+	print STDERR "======LGT-BWA-LCA======\n";
 	print STDERR `mkdir -p $options{output_dir}/lgt_lca-bwa`;
 	$lgtseek->runBWA({
 		input_bam => "$options{output_dir}\/$name\_lgt_host_filtered.bam",
@@ -221,7 +205,7 @@ if($lgtseek->empty_chk({input => $pp_data->{files}->{lgt_donor}})==1){
 }
 
 # Calculate BWA LCA's for Microbiome Reads
-print STDERR "=====Microbiome=====\n";
+print STDERR "======Microbiome======\n";
 ## Check to make sure we found Microbiome Reads. If no microbiome reads skip this step. 
 if($lgtseek->empty_chk({input => "$options{output_dir}\/$name\_microbiome.bam"})==1){
 	print STDERR "No Microbiome reads in: $options{output_dir}\/$name\_microbiome.bam. Skipping microbiome LCA calculation.\n";
@@ -238,7 +222,7 @@ if($lgtseek->empty_chk({input => "$options{output_dir}\/$name\_microbiome.bam"})
 	push(@vals,$filtered_bam->{count});
 	&print_tab("$options{output_dir}/$name\_post_processing.tab",\@header,\@vals);
 
-	print STDERR "=====Microbiome-BWA-LCA=====\n";
+	print STDERR "====Microbiome-BWA-LCA====\n";
 	$lgtseek->runBWA({
 		input_bam => "$options{output_dir}\/$name\_microbiome_filtered.bam",
 		output_dir => "$options{output_dir}\/microbiome_lca-bwa/",
@@ -252,7 +236,7 @@ if($lgtseek->empty_chk({input => "$options{output_dir}\/$name\_microbiome.bam"})
 
 # Calculate coverage of LGT on human side.
 if($lgt_coverage==1){
-	print STDERR "=====Calculating Coverage of Hg19 LGT======\n";
+	print STDERR "==Calculating Coverage of Hg19 LGT==\n";
 	$lgtseek->mpileup({
 		input => "$options{output_dir}\/$name\_lgt_host_filtered.bam",
 		output_dir => $options{output_dir},
@@ -269,7 +253,7 @@ my $lgt_fasta = $lgtseek->sam2Fasta({
 });
 
 # Blast & get best hits
-print STDERR "=====BESTBLAST2=====\n";
+print STDERR "=======BESTBLAST2=======\n";
 my $best_blasts = $lgtseek->bestBlast2({
 		db => $options{path_to_blastdb},
 		lineage1 => $options{donor_lineage},
@@ -279,7 +263,7 @@ my $best_blasts = $lgtseek->bestBlast2({
 });
 
 # Now run lgtfinder
-print STDERR "=====LGTFINDER=====\n";
+print STDERR "========LGTFINDER=========\n";
 my $valid_lgts = $lgtseek->runLgtFinder({
 		lineage1 => $options{donor_lineage},
 		lineage2 => $options{host_lineage},
