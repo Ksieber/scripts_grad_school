@@ -134,7 +134,7 @@ if($decrypt==1){
 			overwrite => 0,
 	});
 } else {$input_bam = $options{input};}
-
+print STDERR "=====INPUT-READY=====\n";
 
 
 # Align to the donors.
@@ -177,43 +177,94 @@ my $pp_data = $lgtseek->bwaPostProcess({
 #print STDERR `rm -rf $options{output_dir}/host_alignments/`;
 #print STDERR `rm -rf $options{output_dir}/donor_alignments/`;
 
-
 # Create file with number of counts
 my @header = ('run_id');
 my @vals = ($name);
 open OUT, ">$options{output_dir}/$name\_post_processing.tab" or die;
 map {
 	push(@header,$_);
-	push(@vals,$pp_data->{counts}->{$_});
+	my $foo = $pp_data->{counts}->{$_} ? $pp_data->{counts}->{$_} : 0;
+	push(@vals,$foo);
 } ('total','host','no_map','all_map','single_map','integration_site_host','integration_site_donor','microbiome','lgt');
 &print_tab("$options{output_dir}/$name\_post_processing.tab",\@header,\@vals);
 
-if($lgtseek->empty_chk({input => $pp_data->{files}->{lgt_donor}})==1){die "No LGT in: $pp_data->{files}->{lgt_donor}\nStopping lgt_seq.\n"}
 
-# Prinseq filter the putative lgts
-print STDERR "=====PRINSEQ=====\n";
-my $filtered_bam = $lgtseek->prinseqFilterBam(
-		{output_dir => "$options{output_dir}/prinseq_filtering",
-		input_bam => $pp_data->{files}->{lgt_donor}}
-);
+## Check to make sure we found LGT.
+print STDERR "=====LGT=====\n";
+if($lgtseek->empty_chk({input => $pp_data->{files}->{lgt_donor}})==1){
+	print STDERR "No LGT in: $pp_data->{files}->{lgt_donor}\. Skipping LGT LCA calculation and blast validation.\n";
+} else {
+	# Prinseq filter the putative lgts
+	print STDERR "=====LGT-PRINSEQ=====\n";
+	my $filtered_bam = $lgtseek->prinseqFilterBam(
+		{output_dir => "$options{output_dir}/lgt_prinseq_filtering",
+		input_bam => $pp_data->{files}->{lgt_host}}
+	);
 
-# Add filtered count to counts.
-push(@header,'lgt_pass_prinseq_filter');
-push(@vals,$filtered_bam->{count});
-&print_tab("$options{output_dir}/$name\_post_processing.tab",\@header,\@vals);
+	# Add filtered count to counts.
+	push(@header,'lgt_pass_prinseq');
+	push(@vals,$filtered_bam->{count});
+	&print_tab("$options{output_dir}/$name\_post_processing.tab",\@header,\@vals);
 
-sub print_tab {
-	my ($file,$header,$vals) = @_;
-	open OUT, ">$file" or die "Couldn't open $file\n";
-	print OUT join("\t",@$header);
-	print OUT "\n";
-	print OUT join("\t",@$vals);
-	print OUT "\n";
+	# Calculate BWA LCA's for LGTs
+	print STDERR "=====LGT-BWA-LCA=====\n";
+	print STDERR `mkdir -p $options{output_dir}/lgt_lca-bwa`;
+	$lgtseek->runBWA({
+		input_bam => "$options{output_dir}\/$name\_lgt_host_filtered.bam",
+		output_dir => "$options{output_dir}\/lgt_lca-bwa/",
+		out_file => "$options{output_dir}\/lgt_lca-bwa\/$name\_lgt_lca-bwa.txt",
+		reference_list => "$options{refseq_list}",
+		run_lca => 1,
+		overwrite => 0,
+		cleanup_sai => 1,
+	});
+}
+
+# Calculate BWA LCA's for Microbiome Reads
+print STDERR "=====Microbiome=====\n";
+## Check to make sure we found Microbiome Reads. If no microbiome reads skip this step. 
+if($lgtseek->empty_chk({input => "$options{output_dir}\/$name\_microbiome.bam"})==1){
+	print STDERR "No Microbiome reads in: $options{output_dir}\/$name\_microbiome.bam. Skipping microbiome LCA calculation.\n";
+} else {
+	# Prinseq filter the putative lgts
+	print STDERR "=====Microbiome-PRINSEQ=====\n";
+	my $filtered_bam = $lgtseek->prinseqFilterBam({
+		output_dir => "$options{output_dir}/microbiome_prinseq_filtering",
+		input_bam => "$options{output_dir}\/$name\_microbiome.bam",
+	});
+
+	# Add filtered count to counts.
+	push(@header,'microbiome_pass_prinseq');
+	push(@vals,$filtered_bam->{count});
+	&print_tab("$options{output_dir}/$name\_post_processing.tab",\@header,\@vals);
+
+	print STDERR "=====Microbiome-BWA-LCA=====\n";
+	$lgtseek->runBWA({
+		input_bam => "$options{output_dir}\/$name\_microbiome_filtered.bam",
+		output_dir => "$options{output_dir}\/microbiome_lca-bwa/",
+		out_file => "$options{output_dir}\/microbiome_lca-bwa\/$name\_microbiome_lca-bwa.txt",
+		reference_list => "$options{refseq_list}",
+		run_lca => 1,
+		overwrite => 0,
+		cleanup_sai => 1,
+	}); 
+}
+
+# Calculate coverage of LGT on human side.
+if($lgt_coverage==1){
+	print STDERR "=====Calculating Coverage of Hg19 LGT======\n";
+	$lgtseek->mpileup({
+		input => "$options{output_dir}\/$name\_lgt_host_filtered.bam",
+		output_dir => $options{output_dir},
+		ref => $options{hg19_ref},
+		cleanup => 1,
+		overwrite => 0,
+	});
 }
 
 # Make LGT Fasta for Blast validation
 my $lgt_fasta = $lgtseek->sam2Fasta({
-		input => "$options{output_dir}\/$name\_lgt_donor.bam",
+		input => "$options{output_dir}\/$name\_lgt_host_filtered.bam",
 		output_dir => "$options{output_dir}/blast_validation/"
 });
 
@@ -240,44 +291,17 @@ my $valid_lgts = $lgtseek->runLgtFinder({
 # Run blast and keep raw output ?
 `blastall -p blastn -e 10e-5 -T F -d $options{path_to_blastdb} -i $lgt_fasta > $options{output_dir}/blast_validation/$name\_blast.raw`;
 
-# Calculate BWA LCA's for LGTs
-print STDERR "=====LGT-BWA-LCA=====\n";
-print STDERR `mkdir -p $options{output_dir}/lgt_lca-bwa`;
-$lgtseek->runBWA({
-		input_bam => "$options{output_dir}\/$name\_lgt_donor.bam",
-		output_dir => "$options{output_dir}\/lgt_lca-bwa/",
-		out_file => "$options{output_dir}\/lgt_lca-bwa\/$name\_lgt_lca-bwa.txt",
-		reference_list => "$options{refseq_list}",
-		run_lca => 1,
-		overwrite => 0,
-		cleanup_sai => 1,
-}); 
 
-# Calculate BWA LCA's for Microbiome Reads
-print STDERR "=====Microbiome-BWA-LCA=====\n";
-print STDERR `mkdir -p $options{output_dir}/microbiome_lca-bwa`;
-$lgtseek->runBWA({
-		input_bam => "$options{output_dir}\/$name\_microbiome.bam",
-		output_dir => "$options{output_dir}\/microbiome_lca-bwa/",
-		out_file => "$options{output_dir}\/microbiome_lca-bwa\/$name\_lgt_lca-bwa.txt",
-		reference_list => "$options{refseq_list}",
-		run_lca => 1,
-		overwrite => 0,
-		cleanup_sai => 1,
-}); 
+print STDERR "======Completed lgt_seq.pl on $options{input}======\n";
 
-if($lgt_coverage==1){
-	print STDERR "=====Calculating Coverage of Hg19 LGT======\n";
-	$lgtseek->mpileup({
-		input => "$options{output_dir}\/$name\_lgt_donor.bam",
-		output_dir => $options{output_dir},
-		ref => $options{hg19_ref},
-		cleanup => 1,
-		overwrite => 0,
-	});
+
+sub print_tab {
+	my ($file,$header,$vals) = @_;
+	open OUT, ">$file" or die "Couldn't open $file\n";
+	print OUT join("\t",@$header);
+	print OUT "\n";
+	print OUT join("\t",@$vals);
+	print OUT "\n";
 }
-
-print STDERR "Completed lgt_seq.pl on $options{input}\n";
-
 __END__
 
