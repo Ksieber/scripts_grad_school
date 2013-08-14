@@ -17,7 +17,6 @@ our @EXPORT = qw( setup_output );
 
 sub setup_output {
     my %output;
-    my $outdir;
     my $outname;
     my $config = shift;
     if(!$config->{input}){die "Must pass &setup_output an input =>\n";}
@@ -26,6 +25,7 @@ sub setup_output {
     my @suffix = qw( .bam .txt .srt.bam .list);
     foreach my $file (@$in){
         my ($fn,$path,$suf)=fileparse($file,@suffix);
+        my $outdir;
         if($subdirs==1){
             $outdir = $config->{output_dir} ? "$config->{output_dir}$fn/" : "$path/$fn/";
         } else {

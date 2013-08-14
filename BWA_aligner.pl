@@ -76,7 +76,7 @@ my $input=setup_input();
 my $out_dir;
 for my $first_input (@$input[0]){
 	if($first_input=~/\.bam$/){
-		$out_dir=setup_output($input);
+		$out_dir=setup_output({input => $input, output_dir => $options{output_dir}});
 	}
 	if($first_input=~/\.fq$/ || $first_input=~/\.fastq$/){
 		my @fastq_list;
@@ -84,7 +84,7 @@ for my $first_input (@$input[0]){
 			my ($file1,$file2)=split(/,/,$fastqs);
 			push(@fastq_list,$file1);
 		}
-		$out_dir=setup_output(\@fastq_list);
+		$out_dir=setup_output({ input => \@fastq_list, output_dir => $options{output_dir}});
 	}
 }	
 
@@ -97,10 +97,10 @@ if ($options{cmd_log}==1) {
 ## Run BWA
 foreach my $files (@$input){
 	foreach my $refs (@ref_list){
-			bwa_align($files,$refs);
-		}
+		bwa_align($files,$refs);
 	}
 }
+
 
 ## BWA alignment
 sub bwa_align {
@@ -129,9 +129,9 @@ sub bwa_align {
 	
 	## Setup output prefix (path/file-name).bam
 	my ($input,$path,$suf)=fileparse($file1,@in_suffix_list);
-	my $out = $options{output_prefix} ? "$options{output_prefix}\_$ref_name" : "$input\_at_$ref_name";
-	my $dir = $out_dir->{$file1}; 
-	if ($dir=~/\/$/) {$dir =~s/\/$//g;}
+	my $out = $options{output_prefix} ? "$options{output_prefix}" : "$input\_at_$ref_name";
+	my $dir = $out_dir->{$file1}->{dir}; 
+	if ($dir=~/\/\/$/){$dir =~s/\/$//g;}
   	my $output_prefix= "$dir\/$out";
   	
   	
