@@ -35,9 +35,9 @@ my $input=setup_input();           ## Returns array(ref) of input(s)
 my $out_dir=setup_output($input);   ## Returns hash(ref) of output dirs Key = input, value = output_dir
 foreach my $file (@$input){
    if($options{test_print}){
-      print STDERR "/local/projects-t3/HLGT/TCGA/decrypt/decrypt.bin $file -password $options{password} -out-dir $out_dir->{$file}\n";
+      print STDERR "/local/projects-t3/HLGT/TCGA/decrypt/decrypt.bin $file -password $options{password} -out-dir $out_dir->{$file}->{dir}\n";
    } else { 
-      `/local/projects-t3/HLGT/TCGA/decrypt/decrypt.bin $file -password $options{password} -out-dir $out_dir->{$file}`;
+      `/local/projects-t3/HLGT/TCGA/decrypt/decrypt.bin $file -password $options{password} -out-dir $out_dir->{$file}-{dir}`;
    }
 }
 

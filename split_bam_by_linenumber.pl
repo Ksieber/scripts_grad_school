@@ -2,19 +2,19 @@
 
 =head1 NAME
 
-lgtseek_split_bam.pl
+split_bam_by_linenumber.pl
 
 =head1 SYNOPSIS
 
-Splits input bams into chunks of a certain size.
+Splits input bam(s) into chunks of a certain size.
 
 =head1 DESCRIPTION
 
-Splits input bams into chunks of a certain size.
+Splits input bam(s) into chunks of a certain size.
 
-=head1 AUTHOR - David R. Riley
+=head1 AUTHOR - Karsten Sieber & David R. Riley
 
-e-mail: driley@som.umaryland.edu
+e-mail: ksieber@som.umaryland.edu
 
 =head1 APPENDIX
 
@@ -22,7 +22,7 @@ The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with a _
 
 =cut
-use lib '/home/ksieber/scripts/lgtseek-master/lib/';
+use warnings;
 use strict;
 use Scalar::Util qw(reftype);
 use Qsub;
@@ -54,7 +54,7 @@ if($options{help}){
       --Qsub           Qsub the split command. Great for processing many bams at once.
       --output_dir=    Directory for output. 
       --subdirs        Make a directory within the output_dir to place the output. 
-      --output_list=   Name the list of output files created.
+      --output_list=   Name the output with the list of files created.
       --bin_dir=       Directory where LGTSeek.pm is stored.
       --help\n";
 }
@@ -91,30 +91,34 @@ if($options{output_list}) {
 
 # Loop over the bam files and split them
 foreach my $file (@$input) {
-    if($options{Qsub}){
-       my ($fn,$path,$sufx)=fileparse($file,".bam");
-       if($path=~/^\.\/$/){ 
-          die "Error: Use full path names for Qsub.\n";
-       }
-       open(SH,">","$out_dir->{$file}/$fn\_split.sh") || die "Error: Can't open shell scipt: $out_dir->{$file}/$fn\_split.sh because: $!\n";
-       print SH "perl ~/scripts/split_bam_by_linenumber.pl --input=$file --line_count=$options{line_count} --output_dir=$out_dir->{$file}";
-       close SH;
-       Qsub("$out_dir->{$file}/$fn\_split.sh");
-       next;
-    }
-    my $split_files = $lgtseek->splitBam({
-        input => $file,
-        seqs_per_file => $options{line_count},
-        output_dir => $out_dir->{$file},
-    });
+  if($options{Qsub}){
+      my ($fn,$path,$sufx)=fileparse($file,".bam");
+      if($path=~/^\.\/$/){ 
+      die "Error: Use full path names for Qsub.\n";
+  }
+  open(SH,">","$out_dir->{$file}/$fn\_split.sh") or die "Error: Can't open shell scipt: $out_dir->{$file}/$fn\_split.sh because: $!\n";
+  my $sub = "perl ~/scripts/split_bam_by_linenumber.pl --input=$file --output_dir=$out_dir->{$file}->{dir}";
+  if($options{line_count}){$sub = $sub." --line_count=$options{line_count}";}
+  if($options{output_list}){$sub = $sub." --output_list=$options{output_list}";}
+      print SH "$sub";
+      close SH;
+      Qsub("$out_dir->{$file}->{name}\_split.sh");
+  } else {
+      my $split_files = $lgtseek->splitBam({
+          input => $file,
+          seqs_per_file => "$options{line_count}",
+          output_dir => "$out_dir->{$file}->{dir}",
+          });
     
-    # Write out the filenames to the list file.
-    if($olistfh) {
+      # Write out the filenames to the list file.
+      if($olistfh) {
         map {
             print $olistfh "$_\n";
         }@$split_files
-    }
+      } 
+  }
 }
+
 
 
 __END__

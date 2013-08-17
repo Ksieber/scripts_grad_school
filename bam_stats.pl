@@ -5,7 +5,6 @@ use warnings;
 use Time::SoFar;
 use File::Basename;
 use LGTSeek;
-use setup_default_paths;
 use setup_input;
 use lib '/local/projects-t3/HLGT/scripts/lgtseek/lib/';
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
@@ -31,18 +30,7 @@ if($options{help}){ die
 if(!$options{input} && !$options{input_list}){die "Must give an --input=<BAM> or --input_list=<list_of_bams>\n";}
 my $append = $options{append} ? $options{append} : 0;
 
-&setup_default_paths();
-
-my $lgtseek = LGTSeek->new({
-		bin_dir => $options{bin_dir},
-		output_dir => $options{output_dir},
-		ergatis_bin => $options{ergatis_dir},
-		prinseq_bin => $options{prinseq_bin},
-		paired_end => 1,
-		taxon_host => $options{taxon_host},
-		taxon_dir => $options{taxon_dir},
-		taxon_idx_dir => $options{taxon_idx_dir}
-});
+my $lgtseek = LGTSeek->new2();
 
 my $input = setup_input();
 
@@ -58,7 +46,8 @@ foreach my $bam (@$input){
 		chomp;
 		my ($flag,$cigar) = (split /\t/, $_)[1,5];
 		my $converted_flag=$lgtseek->_parseFlag($flag);
-		if($cigar =~ /(\d+M)(\d+S)/ || $cigar =~ /(\d+S)(\d+M)/){$counts{SC}++;}
+		if($cigar =~ /(\d+)M(\d+)S/ && $2 >= 24){$counts{SC}++;}
+		if($cigar =~ /(\d+)S(\d+)M/ && $1 >= 24){$counts{SC}++;}
 		if(!$converted_flag->{'qunmapped'} && !$converted_flag->{'munmapped'}){$counts{MM}++;}
 		if(!$converted_flag->{'qunmapped'} && $converted_flag->{'munmapped'}){$counts{MU}++;}
 		if($converted_flag->{'qunmapped'} && !$converted_flag->{'munmapped'}){$counts{MU}++;}

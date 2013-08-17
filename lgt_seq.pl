@@ -25,6 +25,7 @@ use warnings;
 use strict;
 use lib qw(/local/projects-t3/HLGT/scripts/lgtseek/lib/ /opt/lgtseek/lib/);      ### May need to change this depending on where the script is being run
 use LGTSeek;
+use Time::SoFar;
 use File::Basename;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
@@ -56,25 +57,25 @@ my $results = GetOptions (\%options,
 		);
 
 if($options{help}){die "Help: This script will takes a bam and identifies bacterial human LGT.
---input=				<BAM>
---decrypt= 				<0|1> [0]
---url=
---prelim_filter			<0|1> [0] 1=Filter out human M_M reads from original input.
---split_bac_list=
---hg19_ref=
---refseq_list=
---output_dir=
---lgt_coverage=				<0|1> [0] 1= Calculate coverage of hg19 LGT. 
---bin_dir=
---threads=				[1] # of CPU's to use for hyperthreading BWA. 
---taxon_host=
---taxon_dir=
---taxon_idx_dir=
---path_to_blastdb=
---clovr=				<0|1> [0] 1=Use clovr defaults for file paths 
---diag=					<0|1> [0] 1=Use diag node defaults for file paths 
---fs=					<0|1> [0] 1=Use filesystem defaults for file paths 
---help\n";
+		--input=				<BAM>
+		--decrypt= 				<0|1> [0]
+		--url=
+		--prelim_filter			<0|1> [0] 1=Filter out human M_M reads from original input.
+		--split_bac_list=
+		--hg19_ref=
+		--refseq_list=
+		--output_dir=
+		--lgt_coverage=				<0|1> [0] 1= Calculate coverage of hg19 LGT. 
+		--bin_dir=
+		--threads=				[1] # of CPU's to use for hyperthreading BWA. 
+		--taxon_host=
+		--taxon_dir=
+		--taxon_idx_dir=
+		--path_to_blastdb=
+		--clovr=				<0|1> [0] 1=Use clovr defaults for file paths 
+		--diag=					<0|1> [0] 1=Use diag node defaults for file paths 
+		--fs=					<0|1> [0] 1=Use filesystem defaults for file paths 
+		--help\n";
 }
 
 if(!$options{input}){die "Error: Please give an input.bam with --input=<FILE>. Try again or use --help.\n";}
@@ -95,9 +96,9 @@ my $print = "lgt_seq.pl";
 foreach my $key (keys %options){if($options{$key}){$print = "$print"." \-\-$key=$options{$key}";}}
 print STDERR "\n$print\n";
 
-print STDERR "\n+++++++++++++++++++++++++++\n";
-print STDERR "++++++++  LGT-SEQ  ++++++++\n";
-print STDERR "+++++++++++++++++++++++++++\n\n";
+print STDERR "\n++++++++++++++++++++++++++++\n";
+print STDERR "++++++++  LGT-SEQ  +++++++++\n";
+print STDERR "++++++++++++++++++++++++++++\n\n";
 
 ## Setup Default paths for references and bins:
 my $lgtseek = LGTSeek->new2({
@@ -116,20 +117,16 @@ if($decrypt==1){
 		});
 } elsif ($prelim_filter==1) {
 	my $unfiltered_bam;
-	if ($decrypt==1){
-		$unfiltered_bam = $input_bam;
-	} else {
-		$unfiltered_bam = $lgtseek->{input};
-	}
-	$input_bam = $lgtseek->prelim_filter({
+	if ($decrypt==1){ $unfiltered_bam = $input_bam; }
+	else { $unfiltered_bam = $lgtseek->{input}; }
+	my $bams_array_ref = $lgtseek->prelim_filter({
 		input_bam => $unfiltered_bam,
 		output_dir => "$lgtseek->{output_dir}/prelim_filter/",
 		keep_softclip => 1,
 		overwrite => 0,
 		});
-} else {
-	$input_bam = $lgtseek->{input};
-}
+	$input_bam = ${$bams_array_ref}[0];
+} else { $input_bam = $lgtseek->{input}; }
 print STDERR "=========INPUT-READY=======\n";
 
 # Align to the donors.
@@ -144,6 +141,7 @@ my $donor_bams = $lgtseek->runBWA({
 	cleanup_sai => 1,
 	});
 
+time_check();
 
 # Align to the hosts.
 print STDERR "========RUNBWA-HOST========\n";
@@ -156,7 +154,7 @@ my $host_bams = $lgtseek->runBWA({
 	overwrite => 0, 
 	cleanup_sai => 1,   
 	});
-
+time_check();
 
 # Postprocess the results
 print STDERR "=======POSTPROCESS=======\n";
@@ -166,8 +164,8 @@ my $pp_data = $lgtseek->bwaPostProcess({
 	output_prefix => $name,
 	overwrite => 0,   
 	});
-
-# Clean up output we don't need anymore
+time_check();
+# Clean up output we don't need anymore; This is IMPORTANT on nodes.
 #print STDERR "Removing the raw donor/host mappings\n";
 #print STDERR `rm -rf $lgtseek{output_dir}/host_alignments/`;
 #print STDERR `rm -rf $lgtseek{output_dir}/donor_alignments/`;
@@ -213,6 +211,38 @@ my $filtered_bam = $lgtseek->prinseqFilterBam({
 		overwrite => 0,
 		cleanup_sai => 1,
 		});
+	# Make LGT Fasta for Blast validation
+	my $lgt_fasta = $lgtseek->sam2Fasta({
+		input => "$lgtseek->{output_dir}\/$name\_lgt_host_filtered.bam",
+		output_dir => "$lgtseek->{output_dir}/blast_validation/"
+		});
+	time_check();
+
+	# Blast & get best hits
+	print STDERR "=======BESTBLAST2=======\n";
+	my $best_blasts = $lgtseek->bestBlast2({
+		db => $lgtseek->{path_to_blastdb},
+		lineage1 => $lgtseek->{donor_lineage},
+		lineage2 => $lgtseek->{host_lineage},
+		fasta => $lgt_fasta,
+		output_dir => "$lgtseek->{output_dir}/blast_validation/"
+		});
+	time_check();
+
+	# Now run lgtfinder
+	print STDERR "========LGTFINDER=========\n";
+	my $valid_lgts = $lgtseek->runLgtFinder({
+		lineage1 => $lgtseek->{donor_lineage},
+		lineage2 => $lgtseek->{host_lineage},
+		input_file_list => $best_blasts->{list_file},
+		output_prefix => "$name",
+		output_dir => "$lgtseek->{output_dir}/lgt_finder/",
+		});
+	time_check();
+
+	# Run blast and keep raw output ?
+	my $blast_ret = $lgtseek->_run_cmd("blastall -p blastn -e 10e-5 -T F -d $lgtseek->{path_to_blastdb} -i $lgt_fasta > $lgtseek->{output_dir}/blast_validation/$name\_blast.raw");
+	time_check();
 }
 
 # Calculate BWA LCA's for Microbiome Reads
@@ -227,6 +257,7 @@ if($lgtseek->empty_chk({input => "$lgtseek->{output_dir}\/$name\_microbiome.bam"
 		output_dir => "$lgtseek->{output_dir}/microbiome_prinseq_filtering",
 		input_bam => "$lgtseek->{output_dir}\/$name\_microbiome.bam",
 		});
+	time_check();
 
 	# Add filtered count to counts.
 	push(@header,'microbiome_pass_prinseq');
@@ -242,7 +273,8 @@ if($lgtseek->empty_chk({input => "$lgtseek->{output_dir}\/$name\_microbiome.bam"
 		run_lca => 1,
 		overwrite => 0,
 		cleanup_sai => 1,
-		}); 
+		});
+	time_check(); 
 }
 
 # Calculate coverage of LGT on human side.
@@ -255,39 +287,10 @@ if($lgt_coverage==1){
 		cleanup => 1,
 		overwrite => 0,
 		});
+	time_check();
 }
 
-# Make LGT Fasta for Blast validation
-my $lgt_fasta = $lgtseek->sam2Fasta({
-	input => "$lgtseek->{output_dir}\/$name\_lgt_host_filtered.bam",
-	output_dir => "$lgtseek->{output_dir}/blast_validation/"
-	});
-
-
-# Blast & get best hits
-print STDERR "=======BESTBLAST2=======\n";
-my $best_blasts = $lgtseek->bestBlast2({
-	db => $lgtseek->{path_to_blastdb},
-	lineage1 => $lgtseek->{donor_lineage},
-	lineage2 => $lgtseek->{host_lineage},
-	fasta => $lgt_fasta,
-	output_dir => "$lgtseek->{output_dir}/blast_validation/"
-	});
-
-# Now run lgtfinder
-print STDERR "========LGTFINDER=========\n";
-my $valid_lgts = $lgtseek->runLgtFinder({
-	lineage1 => $lgtseek->{donor_lineage},
-	lineage2 => $lgtseek->{host_lineage},
-	input_file_list => $best_blasts->{list_file},
-	output_prefix => "$name",
-	output_dir => "$lgtseek->{output_dir}/lgt_finder/",
-	});
-
-# Run blast and keep raw output ?
-`blastall -p blastn -e 10e-5 -T F -d $lgtseek->{path_to_blastdb} -i $lgt_fasta > $lgtseek->{output_dir}/blast_validation/$name\_blast.raw`;
-
-
+time_check();
 print STDERR "======Completed lgt_seq.pl on $lgtseek->{input}======\n";
 
 
@@ -300,7 +303,10 @@ sub print_tab {
 	print OUT "\n";
 }
 
-
+sub time_check {
+	my $elapsed = runtime(); 
+	print STDERR "Time Since Start: $elapsed\n";
+}
 
 
 
