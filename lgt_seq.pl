@@ -34,10 +34,14 @@ my $results = GetOptions (\%options,
 		'decrypt=s',
 		'url=s',
 		'prelim_filter=s',
+		'keep_softclip=s',
+		'split_bam=s',
+		'seqs_per_file=s',
 		'split_bac_list=s',
 		'hg19_ref=s',
 		'refseq_list=s',
 		'output_dir=s',
+		'subdirs=s',
 		'lgt_coverage=s',
 		'bin_dir=s',
 		'samtools_bin=s',
@@ -57,33 +61,38 @@ my $results = GetOptions (\%options,
 		);
 
 if($options{help}){die "Help: This script will takes a bam and identifies bacterial human LGT.
-		--input=				<BAM>
-		--decrypt= 				<0|1> [0]
-		--url=
-		--prelim_filter			<0|1> [0] 1=Filter out human M_M reads from original input.
-		--split_bac_list=
-		--hg19_ref=
-		--refseq_list=
-		--output_dir=
-		--lgt_coverage=				<0|1> [0] 1= Calculate coverage of hg19 LGT. 
-		--bin_dir=
-		--threads=				[1] # of CPU's to use for hyperthreading BWA. 
+		--input=			<Input BAM>
+		--decrypt= 			<0|1> [0] 1= Decrypt the input bam with a key downloaded from --url=
+		--url=				The url to download the decryption key from. 
+		--prelim_filter=		<0|1> [0] 1= Filter out human M_M reads from original input. (Control prelim_filter with: --keep_softclip, --split_bam, --seqs_per_file)
+		--keep_softclip=		<0|1> [0] 1= Keep reads that are softclipped >=24 bp. 
+		--split_bam=			<0|1> [0] 1= Split bam into --seqs_per_file chunks. 
+		--seqs_per_file=		[50000000] (50 Million)
+		--split_bac_list=		Path to the list of split bacterial references (A2D, E2P, R2Z)
+		--hg19_ref=			Path to hg19 reference
+		--refseq_list=			Path to all bacterial references in refseq. 
+		--output_dir=			Directory for all output. Will be created if it doesn't exist. 
+		--subdirs=			<0|1> [0] 1= Make a sub-directory in output_dir based on input name
+		--lgt_coverage=			<0|1> [0] 1= Calculate coverage of hg19 LGT. 
+		--bin_dir=				
+		--threads=			[1] # of CPU's to use for hyperthreading BWA. 
 		--taxon_host=
 		--taxon_dir=
 		--taxon_idx_dir=
 		--path_to_blastdb=
-		--clovr=				<0|1> [0] 1=Use clovr defaults for file paths 
-		--diag=					<0|1> [0] 1=Use diag node defaults for file paths 
-		--fs=					<0|1> [0] 1=Use filesystem defaults for file paths 
+		--clovr=			<0|1> [0] 1= Use clovr defaults for file paths 
+		--diag=				<0|1> [0] 1= Use diag node defaults for file paths 
+		--fs=				<0|1> [0] 1= Use filesystem defaults for file paths 
 		--help\n";
 }
 
 if(!$options{input}){die "Error: Please give an input.bam with --input=<FILE>. Try again or use --help.\n";}
 if(!$options{output_dir}){print "It is HIGHLY recommended you STOP, restart, and use a --output_dir=<some/where/>.\n";sleep 60;}
 my $threads = $options{threads} ? $options{threads} : 1;
-my $lgt_coverage = $options{lgt_coverage} ? $options{lgt_coverage} : "0";
-my $decrypt = $options{decrypt} ? $options{decrypt} : "0";
-my $prelim_filter = $options{prelim_filter} ? $options{prelim_filter} : "0";
+my $lgt_coverage = $options{lgt_coverage} ? $options{lgt_coverage} : 0;
+my $decrypt = $options{decrypt} ? $options{decrypt} : 0;
+my $prelim_filter = $options{prelim_filter} ? $options{prelim_filter} : 0;
+my $subdirs = $options{subdirs} ? $options{subdirs} : 0;
 if($decrypt == 1 && !$options{url}){die "Error: Must give a --url to use --decrypt.\n";}
 
 
@@ -91,6 +100,7 @@ if($decrypt == 1 && !$options{url}){die "Error: Must give a --url to use --decry
 my ($name,$path,$suf)=fileparse($options{input},('.gpg.bam','_prelim.bam','.bam'));
 chomp $name;
 if(!$options{output_dir}){$options{output_dir}="$path/lgtseq/";}
+if($subdirs==1){$options{output_dir} = "$options{output_dir}"."$name/";}
 
 my $print = "lgt_seq.pl";
 foreach my $key (keys %options){if($options{$key}){$print = "$print"." \-\-$key=$options{$key}";}}
@@ -122,7 +132,6 @@ if($decrypt==1){
 	my $bams_array_ref = $lgtseek->prelim_filter({
 		input_bam => $unfiltered_bam,
 		output_dir => "$lgtseek->{output_dir}/prelim_filter/",
-		keep_softclip => 1,
 		overwrite => 0,
 		});
 	$input_bam = ${$bams_array_ref}[0];
@@ -187,12 +196,12 @@ print STDERR "========LGT========\n";
 if($lgtseek->empty_chk({input => $pp_data->{files}->{lgt_donor}})==1){
 	print STDERR "No LGT in: $pp_data->{files}->{lgt_donor}\. Skipping LGT LCA calculation and blast validation.\n";
 } else {
-# Prinseq filter the putative lgts
-print STDERR "=======LGT-PRINSEQ=======\n";
-my $filtered_bam = $lgtseek->prinseqFilterBam({
-	output_dir => "$lgtseek->{output_dir}/lgt_prinseq_filtering",
-	input_bam => $pp_data->{files}->{lgt_host}
-	});
+	# Prinseq filter the putative lgts
+	print STDERR "=======LGT-PRINSEQ=======\n";
+	my $filtered_bam = $lgtseek->prinseqFilterBam({
+		output_dir => "$lgtseek->{output_dir}/lgt_prinseq_filtering",
+		input_bam => $pp_data->{files}->{lgt_host}
+		});
 
 	# Add filtered count to counts.
 	push(@header,'lgt_pass_prinseq');
@@ -250,7 +259,7 @@ print STDERR "======Microbiome======\n";
 ## Check to make sure we found Microbiome Reads. If no microbiome reads skip this step. 
 if($lgtseek->empty_chk({input => "$lgtseek->{output_dir}\/$name\_microbiome.bam"})==1){
 	print STDERR "No Microbiome reads in: $lgtseek->{output_dir}\/$name\_microbiome.bam. Skipping microbiome LCA calculation.\n";
-	} else {
+} else {
 	# Prinseq filter the putative lgts
 	print STDERR "=====Microbiome-PRINSEQ=====\n";
 	my $filtered_bam = $lgtseek->prinseqFilterBam({
