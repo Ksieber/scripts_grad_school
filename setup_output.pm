@@ -6,7 +6,7 @@ our @ISA = qw(Exporter);
 our @EXPORT = qw( setup_output );
 ## This script will setup output info
 ## Suggested use:
-## my $out = &setup_output($input);
+## my $out = &setup_output({input => $input});
 ## open(OUT,"> $out->{$file}->{dir}/foo.txt");
 ## open(OUT,"> $out->{$file}->{name}.txt");
 ## ARGS
