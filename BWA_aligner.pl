@@ -25,26 +25,36 @@ our $results = GetOptions (\%options,
                         'mapped_only=s',
                         'cmd_log=s',
                         'help|h',
+                        'help_full'
 );
 
-if ($options{help}) {die "\nHELP: This script will align the input (fastq/bam) to a reference.
-\t--input=			Input file to be BWA mapped. Either: fastq, or bam. (Fastq_1,Fastq_2)
-\t--input_list=			List of input files to be mapped. 1 bam/line. _1,_2 fastq/line (fastqs MUST be comma seperated).
-\t--ref=				Reference.fna+index
-\t--ref_list=			List of References.
-\t--output_prefix=		Prefix for each output.  Ie. (SRA_LGT)_at_\$ref_name
-\t--output_dir=			Will output to current working directory unless another is specified with this. ie. /ksieber_dir/tmp/
-\t--subdirs=			<0|1> [0] 1= Make subdirectories for each input file to be mapped.
-\t--t=				<#>   [1] Set the number of cpu threads to use for bwa aln steps. USE CAREFULLY.   
-\t--disable_SW=			<0|1> [0] 1= Disable Smith-Waterman for the UM mate. Ideal for quicker LGT mappings IF they are high confidence. 
-\t--mapped_only=			<0|1> [0] 1= Only keep mates with 1 mapped read.
-\t--sam_output=			<0|1> [0] 0=.bam output; 1=.sam output
-\t--sort_index_bams=		<0|1> [0] 1=Sort and index the new.bam into new.srt.bam and new.srt.bai. 
-\t--mpileup=			<0|1> [0] 1= Calculate pileup coverage on .bam.
-\t--no_cleanup=			<0|1> [0] 0= Removes .sai files and unsorted.bam with --sort_index_bams. 1=No deleting intermediate data. 
-\t--insert_metrics=		<0|1> [0] 1= Use Picard to calculate insert size metrics.
-\t--cmd_log=			<0|1> [0] 1= Log all commands run in each output_dir/output_prefix.cmd_log
-\t--help\n";
+if ($options{help}) {die "\nHELP: This script will BWA align the input to a reference.
+		--input=			Input file to be BWA mapped. Either: in.bam or in_1.fq,in_2.fq
+		--ref=				Reference.fna+index
+		--output_dir=			Will output to current working directory unless another is specified with this. ie. /ksieber_dir/tmp/
+		--help 				Basic Help Info
+		--help_full 			Full Help Info\n";
+}
+
+
+if ($options{help_full}) {die "\nHELP: This script will align the input (fastq/bam) to a reference.
+	\t--input=			Input file to be BWA mapped. Either: in.bam or in_1.fq,in_2.fq
+	\t--input_list=			List of input files to be mapped. 1 bam/line. _1,_2 fastq/line (fastqs MUST be comma seperated).
+	\t--ref=				Reference.fna+index
+	\t--ref_list=			List of References.
+	\t--output_prefix=		Prefix for each output.  Ie. (SRA_LGT)_at_\$ref_name
+	\t--output_dir=			Will output to current working directory unless another is specified with this. ie. /ksieber_dir/tmp/
+	\t--subdirs=			<0|1> [0] 1= Make subdirectories for each input file to be mapped.
+	\t--t=				<#>   [1] Set the number of cpu threads to use for bwa aln steps. USE CAREFULLY.   
+	\t--disable_SW=			<0|1> [0] 1= Disable Smith-Waterman for the UM mate. Ideal for quicker LGT mappings IF they are high confidence. 
+	\t--mapped_only=			<0|1> [0] 1= Only keep mates with 1 mapped read.
+	\t--sam_output=			<0|1> [0] 0= .bam output; 1= .sam output
+	\t--sort_index_bams=		<0|1> [0] 1= Sort and index the new.bam into new.srt.bam and new.srt.bai. 
+	\t--mpileup=			<0|1> [0] 1= Calculate pileup coverage on .bam.
+	\t--no_cleanup=			<0|1> [0] 0= Removes .sai files and unsorted.bam with --sort_index_bams. 1=No deleting intermediate data. 
+	\t--insert_metrics=		<0|1> [0] 1= Use Picard to calculate insert size metrics.
+	\t--cmd_log=			<0|1> [0] 1= Log all commands run in each output_dir/output_prefix.cmd_log
+	\t--help\n";
 }
 
 if (!$options{input} && !$options{input_list}) {die "Error: Must give input files to map with --input or --input_list.\n";}
@@ -70,7 +80,7 @@ if($options{ref_list}){
 }
 
 ## Setup the input list
-my $input=setup_input();
+my $input=setup_input(\%options);
 
 ## Setup output directories
 my $out_dir;
