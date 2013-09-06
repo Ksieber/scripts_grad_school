@@ -58,10 +58,10 @@ foreach my $bam (@in_list){
 
 #### Determine options for samtools view & mpileup
     my $view = "-hu";              ## Default
-    my $mpileup = "-Ad 100000";    ## Default
-    my $f = "-F0x10";              ## samtools view options for looking @ Forward stranded reads
-    my $r = "-f0x10";              ## samtools view options for looking @ Reverse stranded reads
-    my $region = $options{region} ? $options{region} : " " ;
+        my $mpileup = "-Ad 100000";    ## Default
+        my $f = "-F0x10";              ## samtools view options for looking @ Forward stranded reads
+        my $r = "-f0x10";              ## samtools view options for looking @ Reverse stranded reads
+        my $region = $options{region} ? $options{region} : " " ;
 
     if($options{wrong_direction}){      ## Had to make a seperate section for processing because we need to do serial parsing for FF &| RR. 
         $view = "-huF0xC";
