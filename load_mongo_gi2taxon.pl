@@ -38,14 +38,18 @@ my $results = GetOptions (\%options,
                           );
 
 my $port=$options{port} ? $options{port} : 10001;
+my $lgtseek = LGTSeek->new2({
+        options => \%options
+        });
 
+print STDERR "Here with dbhost: $lgtseek->{dbhost}\:$lgtseek->{port}.\n";
 # Create an lgtseek object
-my $lgtseek = LGTSeek->new({
-    taxon_dir => $options{taxon_dir},
-    taxon_host => $options{dbhost}.":$port",
-    chunk_size => '500000',
-    taxon_idx_dir => $options{taxon_idx_dir}, 
-});
+#my $lgtseek = LGTSeek->new({
+#    taxon_dir => $options{taxon_dir},
+#    taxon_host => $options{dbhost}.":$port",
+#    chunk_size => '500000',
+#    taxon_idx_dir => $options{taxon_idx_dir}, 
+#});
 
 my $gi2tax = $lgtseek->getGiTaxon();
 # OK, hopefully that worked.
