@@ -70,43 +70,53 @@ if($options{help}){die "Help: This script will identify bacterial human LGT.
 		--input=			<Input BAM>
 		--output_dir=			Directory for all output. Will be created if it doesn't exist. 
 		--subdirs=			<0|1> [0] 1= Make a sub-directory in output_dir based on input name
-		--help				Help Basic Info
 		--help_full 			Help Full Info\n";
 }
 
 if($options{help_full}){die "Help: This script takes a bam and identifies bacterial human LGT.
+		----------------------------------------------------------------------------------------
 		--input=			<Input BAM>
-		--input_list=		<List of BAMS> 1 per line.
+		--input_list=			<List of BAMS> 1 per line.
+		----------------------------------------------------------------------------------------
 		--decrypt= 			<0|1> [0] 1= Decrypt the input bam with a key downloaded from --url=
-		--url=				The url to download the decryption key from.
+		  --url=			The url to download the decryption key from.
+		----------------------------------------------------------------------------------------
 		--name_sort_input=		<0|1> [0] 1= Resort input bam by read name. 
 		--prelim_filter=		<0|1> [0] 1= Filter out human M_M reads from original input.
-		--keep_softclip=		<0|1> [1] 1= Keep reads that are softclipped >=24 bp. 
+		  --keep_softclip=		<0|1> [1] 1= Keep reads that are softclipped >=24 bp. 
 		--split_bam=			<0|1> [1] 1= Split bam into --seqs_per_file chunks. 
-		--seqs_per_file=		[50000000] (50 Million)
+		  --seqs_per_file=		[50000000] (50 Million)
+		----------------------------------------------------------------------------------------
 		--split_bac_list=		Path to the list of split bacterial references (A2D, E2P, R2Z)
 		--hg19_ref=			Path to hg19 reference
 		--refseq_list=			Path to all bacterial references in refseq. 
+		----------------------------------------------------------------------------------------
 		--output_dir=			Directory for all output. Will be created if it doesn't exist. 
-		--subdirs=			<0|1> [0] 1= Make a sub-directory in output_dir based on input name
+		  --subdirs=			<0|1> [0] 1= Make a sub-directory in output_dir based on input name
+		----------------------------------------------------------------------------------------
 		--Qsub=				<0|1> [0] 1= qsub the job to the grid.
-		--project=			[jdhotopp-lab] Grid project to use. 
-		--lgt_coverage=			<0|1> [0] 1= Calculate coverage of hg19 LGT. 
-		--bin_dir=			[/local/projects-t3/HLGT/scripts/lgtseek/bin/]
+		  --project=			[jdhotopp-lab] Grid project to use. 
 		--threads=			[1] # of CPU's to use for multithreading BWA sampe 
+		----------------------------------------------------------------------------------------
+		--lgt_coverage=			<0|1> [0] 1= Calculate coverage of hg19 LGT. 
+		----------------------------------------------------------------------------------------
+		--bin_dir=			[/local/projects-t3/HLGT/scripts/lgtseek/bin/]
 		--taxon_host=			[mongotest1-lx.igs.umaryland.edu:10001]
 		--taxon_dir=			[/local/db/repository/ncbi/blast/20120414_001321/taxonomy/]
 		--taxon_idx_dir=		[/local/projects-t3/HLGT/idx_dir/20120414]
 		--path_to_blastdb=		[/local/db/repository/ncbi/blast/20120414_001321/nt/nt]
+		----------------------------------------------------------------------------------------
+		--fs=				<0|1> [1] 1= Use filesystem defaults for file paths 
 		--clovr=			<0|1> [0] 1= Use clovr defaults for file paths 
 		--diag=				<0|1> [0] 1= Use diag node defaults for file paths 
-		--fs=				<0|1> [0] 1= Use filesystem defaults for file paths 
+		----------------------------------------------------------------------------------------
 		--help				Help Basic Info
-		--help_full 			Help Full Info\n";
+		--help_full 			Help Full Info
+		----------------------------------------------------------------------------------------\n";
 }
 
 
-if(!$options{input}){die "Error: Please give an input.bam with --input=<FILE>. Try again or use --help.\n";}
+if(!$options{input} && !$options{input_list}){die "Error: Please give an input.bam with --input=<FILE> or --input_list=<LIST>. Try again or use --help_full.\n";}
 if(!$options{output_dir}){print "It is HIGHLY recommended you STOP, restart, and use a --output_dir=<some/where/>.\n";sleep 60;}
 
 ## Setup Default paths for references and bins:
@@ -115,30 +125,47 @@ my $lgtseek = LGTSeek->new2({
 	});
 
 my $inputs = setup_input(\%options);
+
+if($options{input_list}){
+	my ($foo,$bar,$suff) = fileparse(@$inputs[0],('_resorted.\d+.bam','_resorted.bam','.gpg.bam','_prelim.bam','.bam'));
+	if($foo=~/(\w+)\_\d+$/){$foo=$1;}
+	$lgtseek->_run_cmd("mkdir -p $lgtseek->{output_dir}/$foo");
+	$options{output_dir} = "$options{output_dir}/$foo";
+}
+
 foreach my $input (@$inputs){
 	if($lgtseek->{decrypt}==1 && !$lgtseek->{url}){die "Error: Must give a --url to use --decrypt.\n";}
-	my ($name,$path,$suf)=fileparse($lgtseek->{input},('.gpg.bam','_prelim.bam','.bam'));
+	my ($name,$path,$suf)=fileparse($input,('.gpg.bam','_prelim.bam','.bam'));
 	chomp $name;
 	if(!$lgtseek->{output_dir}){$lgtseek->{output_dir}="$path/lgtseq/";}
 	if($lgtseek->{subdirs}==1){$lgtseek->_run_cmd("mkdir -p $lgtseek->{output_dir}"); $lgtseek->{output_dir} = "$options{output_dir}/"."$name/";}
 
 	## Qsub the job instead of running it
 	if($lgtseek->{Qsub}==1){
-		my $cmd = "/home/ksieber/scripts/lgt_seq.pl";
-		foreach my $key (keys %options){
-			next if ($key=~/Qsub/);
-			if($options{$key}){$cmd = $cmd." --$key=$options{$key}"};
+		my $cmd = "/home/ksieber/scripts/lgt_seq.pl";						## Start building the cmd to qsub
+		if($options{input_list}){
+			$options{input} = $input;										## If we are in the orignal call, we need to make sure to qsub a single input
 		}
+		foreach my $key (keys %options){
+			next if($options{input_list} && $key=~/input_list/);			## If we are in the orignal call, we don't want to qsub more lists
+			next if ($key=~/Qsub/ && !$options{input_list});			## If we are in the orignal call with input_list, we probably want to qsub each input
+			if($options{$key}){$cmd = $cmd." --$key=$options{$key}"};		## Build the command for all other options passed in @ original call
+		}
+        $name =~ /(\w{1,10})$/;                                             ## Grab the last 1-10 character of the input name to use as the job_name
+        my $job_name = $1;
 		Qsub2({
 			cmd => $cmd,
 			threads => "$lgtseek->{threads}",
-			wd => "$lgtseek->{output_dir}",
+			wd => "$options{output_dir}",
+            name => "$job_name",
 			project => "$lgtseek->{project}",
 			});
-		last;
+		sleep 20;
+		next;
 	}
 
 
+	## Log lgt_seq.pl command to STDERR 
 	my $print = "lgt_seq.pl";
 	foreach my $key (keys %options){if($options{$key}){$print = "$print"." \-\-$key=$options{$key}";}}
 	print STDERR "\n$print\n";
@@ -147,28 +174,34 @@ foreach my $input (@$inputs){
 	print STDERR "++++++++  LGT-SEQ  +++++++++\n";
 	print STDERR "++++++++++++++++++++++++++++\n\n";
 
-	# Get input ready for processing with decryption and/or prelim filtering
-	print STDERR "=========PREP-INPUT========\n";
-	my $input_bam;
-	if($lgtseek->{decrypt}==1){
-		$input_bam = $lgtseek->decrypt({
-			input => $lgtseek->{input},
-			url => $lgtseek->{url},
-			output_dir => $lgtseek->{output_dir}
-			});
-	} elsif ($lgtseek->{prelim_filter}==1) {
-		my $unfiltered_bam;
-		if ($lgtseek->{decrypt}==1){ $unfiltered_bam = $input_bam; }
-		else { $unfiltered_bam = $lgtseek->{input}; }
-		my $bams_array_ref = $lgtseek->prelim_filter({
-			input_bam => $unfiltered_bam,
-			output_dir => "$lgtseek->{output_dir}/prelim_filter/",
-			overwrite => 0,
-			});
-		$input_bam = ${$bams_array_ref}[0];
-	} else { $input_bam = $lgtseek->{input}; }
-	print STDERR "=========INPUT-READY=======\n";
+	## This isn't going to work as is NEED TO FIX!!!!!! or remove ...
 
+	# # Get input ready for processing with decryption and/or prelim filtering
+	# print STDERR "=========PREP-INPUT========\n";
+	# my $input_bam;
+	# if($lgtseek->{decrypt}==1){
+	# 	$input_bam = $lgtseek->decrypt({								## Decrypt .gpg.bam with the key downloaded from --url=<URL>. Ideal for on diag nodes.
+	# 		input => $input,
+	# 		url => $lgtseek->{url},
+	# 		output_dir => $lgtseek->{output_dir}
+	# 		});
+	# } elsif ($lgtseek->{prelim_filter}==1) {							## Preliminary filter input bam. 
+	# 	my $unfiltered_bam;												## Primaryly used to remove previously human M_M reads. 
+	# 	if ($lgtseek->{decrypt}==1){ $unfiltered_bam = $input_bam; }	## This can also resort by name instead of position (probably needed)
+	# 	else { $unfiltered_bam = $input; }								## By default keeps soft clipped human M_M reads (potentially on LGT)
+	# 	my $bams_array_ref = $lgtseek->prelim_filter({					## By default it also splits output into smaller chunks of 50M. 
+	# 		input_bam => $unfiltered_bam,
+	# 		output_dir => "$lgtseek->{output_dir}/prelim_filter/",
+	# 		overwrite => 0,
+	# 		});
+	# 	$input_bam = ${$bams_array_ref}[0];
+	# } else { 
+	# 	$input_bam = $input; 
+	# }
+	# print STDERR "=========INPUT-READY=======\n";
+	
+	my $input_bam = $input; 
+	
 	# Align to the donors.
 	print STDERR "========RUNBWA-DONOR========\n";
 	my $donor_bams = $lgtseek->runBWA({
@@ -344,7 +377,7 @@ foreach my $input (@$inputs){
 	}
 
 	time_check();
-	print STDERR "======Completed lgt_seq.pl on $lgtseek->{input}======\n";
+	print STDERR "======Completed lgt_seq.pl on $input======\n";
 }
 
 sub print_tab {
