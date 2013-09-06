@@ -18,7 +18,7 @@ sub setup_input {
        push(@inputList,$options->{input});
    }	
    if($options->{input_list}){
-     	open(LIST,"<","$options->{input_list}") or die "Can't open --input_list.\n";
+     	open(LIST,"<","$options->{input_list}") or die "Can't open --input_list: $options->{input_list} because: $!\n";
    	    while(<LIST>){
    		    chomp;
   		    push(@inputList,$_);
