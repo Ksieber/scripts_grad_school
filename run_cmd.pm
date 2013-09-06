@@ -1,7 +1,7 @@
 package run_cmd;
+#use warnings;
 use strict;
 use File::Basename;
-use warnings;
 use Carp;
 use Exporter;
 our @ISA = qw(Exporter);
@@ -103,6 +103,7 @@ sub Qsub {
 	Args	:
 		cmd 	=> command/shell script to be qsub'ed
 		log 	=> file to log in
+		name	=> Job Name
 		threads	=> # cpu threads to use
 		mem		=> min amount of RAM to use
 	 	project	=> grid project to use
@@ -112,21 +113,24 @@ sub Qsub {
 
 sub Qsub2 {
  	my $config=$_[0];
+ 	if(!$config->{cmd}){die "Must use cmd => <Command to qsub>. Please Fix.\n";}
  	my $cmd = $config->{cmd};
  	my $log = $config->{log};
- 	my $wd = $config->{wd} ? "-wd $config->{wd}" : "";
- 	my $threads = $config->{threads} ? "-pe thread $config->{threads} -q threaded.q" : "";
- 	my $mem = $config->{mem} ? "-l mf=$config->{mem}" : "";
- 	my $project = $config->{project} ? "-P $config->{project}" : "-P jdhotopp-lab";
- 	my $cwd;
- 	if($config->{cwd}){$cwd = "-cwd";} else {$cwd="";}
+ 	my $wd = $config->{wd} ? " -wd $config->{wd}" : undef;
+ 	my $threads=undef;
+ 	my $t = $config->{threads} ? $config->{threads} : 1;
+ 	if($t>=2){$threads = " -pe thread $t -q threaded.q";}
+ 	my $mem = $config->{mem} ? " -l mf=$config->{mem}" : undef;
+ 	my $project = $config->{project} ? " -P $config->{project}" : " -P jdhotopp-lab";
+ 	my $cwd = $config->{cwd} ? " -cwd" : undef;
+    my $name = $config->{name} ? " -N $config->{name}" : undef;
  	my $fh;
  	if($log){
    		open($fh,">>","$log") or die "Can't open: $fh because: $!\n";
 	} else { 
 		$fh = *STDERR;
 	}
-	my $qsub = "qsub -V $project $wd $cwd $mem $threads";
+	my $qsub = "qsub -V$name$project$wd$cwd$mem$threads";
 	print $fh "QSUB: echo \"$cmd\" | $qsub\n";
 	my $que;
 	if($cmd=~/\.sh$/){
