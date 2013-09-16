@@ -49,7 +49,7 @@ my $results = GetOptions (\%options,
 	'output_dir=s',
 	'subdirs=s',
 	'output_list',
-	'overwrite',
+	'overwrite=s',
 	'samtools_bin=s',
 	'ergatis_dir=s',
 	'output_list=s',
@@ -76,10 +76,10 @@ if($options{help_full}){
 		--input=		<BAM>
 		--input_list=   	<LIST of BAMS> 1 bam per line.
 		----------------------------------------------------------------------------------------
-		--name_sort_input= 	<0|1> [1] 1= Resort the input bam by read names.  
-		  --sort_mem=		<Bytes> [10500000000] Mem free to sort reads with. More memory allows for less intermidiate files.
 		--prelim_filter= 	<0|1> [1] 1= Filter out M_M reads, keeping MU,UU,and SC. 
 		  --keep_softclip=	<0|1> [1] 1= Keep soft clipped reads >=24 bp (Reads potentially on LGT) 
+		--name_sort_input= 	<0|1> [1] 1= Resort the input bam by read names.  
+		  --sort_mem=		<Bytes> [7500000000] Mem free to sort reads with. More memory limits intermidiate files.  
 		--split_bam=		<0|1> [1] 1= Split bam(s)
 		  --seqs_per_file=    	<lines per bam> [50,000,000]
 		--encrypt=       	<0|1> [0] 1= encrypt ** untested **
@@ -113,7 +113,7 @@ $options{prelim_filter} = $options{prelim_filter} ? $options{prelim_filter} : 1;
 $options{keep_softclip} = $options{keep_softclip} ? $options{keep_softclip} : 1;
 $options{split_bam} = $options{split_bam} ? $options{split_bam} : 1;
 $options{overwrite} = $options{overwrite} ? $options{overwrite} : 0;
-$options{sub_mem} = $options{sub_mem} ? $options{sub_mem} : "40G";
+$options{sub_mem} = $options{sub_mem} ? $options{sub_mem} : "10G";
 
 my $lgtseek = LGTSeek->new2({
 	options => \%options,											## Pass %options to lgtseek.
@@ -151,8 +151,8 @@ foreach my $input (@$input){
 		$bams = $lgtseek->prelim_filter({
 			input_bam => $input,
 			output_dir => $output_dir,
-			name_sort_input => $lgtseek->{name_sort_input},				## Default = 0
-			sort_mem => $lgtseek->{sort_mem},							## Default = 10G
+			name_sort_input => $lgtseek->{name_sort_input},				## Default = 1
+			sort_mem => $lgtseek->{sort_mem},							## Default = 6G lgtseek default. lgt_prep overides to 40G. 
 			split_bam => $lgtseek->{split_bam},							## Default = 1
 			seqs_per_file => $lgtseek->{seqs_per_file},					## Default = 50M
 			keep_softclip => $lgtseek->{keep_softclip},					## Default = 1
@@ -174,12 +174,7 @@ foreach my $input (@$input){
 	## Print out the output list
 	if($lgtseek->{output_list}==1){
 		# Open a list file to write the output bams to
-		my $olistfh;
-		if($lgtseek->{output_list}==1) {
-			open($olistfh, ">$output_dir/output.list") or die "Unable to open: $output_dir/output.list because: $1\n";
-		} else {
-			$olistfh = *STDERR;
-		}
+		open(my $olistfh, ">$output_dir/output.list") or die "Unable to open: $output_dir/output.list because: $!\n";
  		if($lgtseek->{encrypt}==1){foreach my $out (@encrypted){print $olistfh "$out\n";}} 
 		elsif ($lgtseek->{split_bam}==1 || $lgtseek->{prelim_filter}==1){foreach my $out2 (@$bams){print $olistfh "$out2\n";}}
 		#else {print $olistfh "$in_bam\n";}

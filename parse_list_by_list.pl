@@ -41,10 +41,10 @@ if($lgtseek->{good_list}){$good_ids = $lgtseek->_read_ids({ list => $lgtseek->{g
 if($lgtseek->{bad_list}){$bad_ids = $lgtseek->_read_ids({ list => $lgtseek->{bad_list} });} 
 ## Setup input and output bams
 my $input = $lgtseek->{input_list};
-my ($fn,$path,$suf)=fileparse($input,('/\.\w+$/',".list"));
+my ($fn,$path,$suf)=fileparse($input,('.list','.txt','\.\w+$'));
 my $out_dir = $lgtseek->{output_dir} ? $lgtseek->{output_dir} : $path;
 my $prefix = $lgtseek->{output_prefix} ? $lgtseek->{output_prefix} : $fn;
-my $suffix = $lgtseek->{output_suffix} ? $lgtseek->{output_prefix} : "_filtered.list";
+my $suffix = $lgtseek->{output_suffix} ? $lgtseek->{output_suffix} : "_filtered.list";
 my $out_fn = $lgtseek->{output_name} ? $lgtseek->{output_name} : "$prefix$suffix";
 my $out = "$out_dir$out_fn";
 open(my $ifh, "<","$lgtseek->{input_list}") or die "Can't open input_list: $lgtseek->{input_list} because: $!\n";

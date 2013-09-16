@@ -22,7 +22,7 @@ sub setup_output {
     if(!$config->{input}){die "Must pass &setup_output an input =>\n";}
     my $in = $config->{input};
     my $subdirs = $config->{subdirs} ? $config->{subdirs} : 0;
-    my @suffix = qw( .bam .txt .srt.bam .list);
+    my @suffix = qw( .bam .txt .srt.bam .list _\d+.fastq .fastq );
     foreach my $file (@$in){
         my ($fn,$path,$suf)=fileparse($file,@suffix);
         my $outdir;

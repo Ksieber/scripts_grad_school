@@ -5,7 +5,7 @@ use File::Basename;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
 my $results = GetOptions (\%options,
-      'bam=s',
+      'input=s',
       'fasta=s',
       'no_nums=s',
       'interleaved=s',
@@ -13,16 +13,16 @@ my $results = GetOptions (\%options,
       );
 if($options{help}){die
    "This script will take a bam and output the fastq. 
-    --bam=		input bam or use ARGV[0].
+    --input=		input bam or use ARGV[0].
     --fasta= 		<0|1> [0] 0=Fastq. 1=fasta
     --interleaved= 	<0|1> [0] 0=Seperate files for output(_1/_2). 1=Interleaved pairs.
     --no_nums=  	<0|1> [0] 0=Add _1 and _2 to the fastq. 1=Don't add numbers.\n";
 }
 ## Open Input
-if(!$ARGV[0] && !$options{bam}){die
+if(!$ARGV[0] && !$options{input}){die
    "Must give an input bam with ARGV[0] or --bam=<input>.\n";
 }
-my $in = $options{bam} ? $options{bam} : $ARGV[0];
+my $in = $options{input} ? $options{input} : $ARGV[0];
 open(IN,"-|","samtools view $in") || die "Unable to open input $in.\n";
 my ($fn,$path,$suf)=fileparse($in,'.bam');
 

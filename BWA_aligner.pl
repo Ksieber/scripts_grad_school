@@ -15,7 +15,7 @@ our $results = GetOptions (\%options,
                         'subdirs=s',
                         'ref=s',
                         'ref_list=s',
-                        't=s',
+                        'threads=s',
                         'disable_SW=s',
                         'bam_output=s',
                         'sort_index_bams=s',
@@ -24,6 +24,9 @@ our $results = GetOptions (\%options,
                         'insert_metrics=s',
                         'mapped_only=s',
                         'cmd_log=s',
+                        'Qsub=s',
+                        'project=s',
+                        'sub_mem=s',
                         'help|h',
                         'help_full'
 );
@@ -38,31 +41,39 @@ if ($options{help}) {die "\nHELP: This script will BWA align the input to a refe
 
 
 if ($options{help_full}) {die "\nHELP: This script will align the input (fastq/bam) to a reference.
-	\t--input=			Input file to be BWA mapped. Either: in.bam or in_1.fq,in_2.fq
-	\t--input_list=			List of input files to be mapped. 1 bam/line. _1,_2 fastq/line (fastqs MUST be comma seperated).
-	\t--ref=				Reference.fna+index
-	\t--ref_list=			List of References.
-	\t--output_prefix=		Prefix for each output.  Ie. (SRA_LGT)_at_\$ref_name
-	\t--output_dir=			Will output to current working directory unless another is specified with this. ie. /ksieber_dir/tmp/
-	\t--subdirs=			<0|1> [0] 1= Make subdirectories for each input file to be mapped.
-	\t--t=				<#>   [1] Set the number of cpu threads to use for bwa aln steps. USE CAREFULLY.   
-	\t--disable_SW=			<0|1> [0] 1= Disable Smith-Waterman for the UM mate. Ideal for quicker LGT mappings IF they are high confidence. 
-	\t--mapped_only=			<0|1> [0] 1= Only keep mates with 1 mapped read.
-	\t--sam_output=			<0|1> [0] 0= .bam output; 1= .sam output
-	\t--sort_index_bams=		<0|1> [0] 1= Sort and index the new.bam into new.srt.bam and new.srt.bai. 
-	\t--mpileup=			<0|1> [0] 1= Calculate pileup coverage on .bam.
-	\t--no_cleanup=			<0|1> [0] 0= Removes .sai files and unsorted.bam with --sort_index_bams. 1=No deleting intermediate data. 
-	\t--insert_metrics=		<0|1> [0] 1= Use Picard to calculate insert size metrics.
-	\t--cmd_log=			<0|1> [0] 1= Log all commands run in each output_dir/output_prefix.cmd_log
-	\t--help\n";
+	--input=			Input file to be BWA mapped. Either: in.bam or in_1.fq,in_2.fq
+	--input_list=			List of input files to be mapped. 1 bam/line. _1,_2 fastq/line (fastqs MUST be comma seperated).
+	--ref=				Reference.fna+index
+	--ref_list=			List of References.
+	--output_prefix=		Prefix for each output.  Ie. (SRA_LGT)_at_\$ref_name
+	--output_dir=			Will output to current working directory unless another is specified with this. ie. /ksieber_dir/tmp/
+	--subdirs=			<0|1> [0] 1= Make subdirectories for each input file to be mapped. 
+	--disable_SW=			<0|1> [0] 1= Disable Smith-Waterman for the UM mate. Ideal for quicker LGT mappings IF they are high confidence. 
+	--mapped_only=			<0|1> [0] 1= Only keep mates with 1 mapped read.
+	--sam_output=			<0|1> [0] 0= .bam output; 1= .sam output
+	--sort_index_bams=		<0|1> [0] 1= Sort and index the new.bam into new.srt.bam and new.srt.bai. 
+	--mpileup=			<0|1> [0] 1= Calculate pileup coverage on .bam.
+	--no_cleanup=			<0|1> [0] 0= Removes .sai files and unsorted.bam with --sort_index_bams. 1=No deleting intermediate data. 
+	--insert_metrics=		<0|1> [0] 1= Use Picard to calculate insert size metrics.
+	--Qsub=				<0|1> [0] 1= qsub the mapping to SGE grid.
+	  --threads=				< # >   [1] Set the number of cpu threads to use for bwa aln steps. USE CAREFULLY.
+	  --project=			[jdhotopp-lab]
+	  --sub_mem=			[6G] Memory free for qsub.
+	  --name=				Name qsub submission. 
+	--cmd_log=			<0|1> [0] 1= Log all commands run in each output_dir/output_prefix.cmd_log	
+	--help\n";
 }
 
 if (!$options{input} && !$options{input_list}) {die "Error: Must give input files to map with --input or --input_list.\n";}
 if (!$options{ref} && !$options{ref_list}) {die "ERROR:  Must have enter a reference file to use.\n";}
-my @in_suffix_list=('.bam','.fastq','.fq');  
+my @in_suffix_list=('.bam','_\d+.fastq','.fastq','.fq');  
 my @ref_suffix_list=('.fa','.fna','.txt');
 my $threads = $options{t} ? $options{t} : "1";													## Default # of threads = 1
 if ($options{mpileup}==1) {$options{sort_index_bams}=1;}										## Mpileup needs a srt.bam, so turn it on automatically if --mpileup is passed
+my $subdirs = $options{subdirs} ? $options{subdirs} : 0;
+my $threads = $options{threads} ? $options{threads} : 1;
+my $project = $options{project} ? $options{project} : "jdhotopp-lab";
+my $sub_mem = $options{sub_mem} ? $options{sub_mem} : "6G";
 my @ref_list;
 
 
@@ -86,7 +97,7 @@ my $input=setup_input(\%options);
 my $out_dir;
 for my $first_input (@$input[0]){
 	if($first_input=~/\.bam$/){
-		$out_dir=setup_output({input => $input, output_dir => $options{output_dir}});
+		$out_dir=setup_output({input => $input, output_dir => $options{output_dir}, subdirs => $subdirs});
 	}
 	if($first_input=~/\.fq$/ || $first_input=~/\.fastq$/){
 		my @fastq_list;
@@ -94,7 +105,7 @@ for my $first_input (@$input[0]){
 			my ($file1,$file2)=split(/,/,$fastqs);
 			push(@fastq_list,$file1);
 		}
-		$out_dir=setup_output({ input => \@fastq_list, output_dir => $options{output_dir}});
+		$out_dir=setup_output({ input => \@fastq_list, output_dir => $options{output_dir}, subdirs => $subdirs});
 	}
 }	
 
@@ -107,7 +118,30 @@ if ($options{cmd_log}==1) {
 ## Run BWA
 foreach my $files (@$input){
 	foreach my $refs (@ref_list){
-		bwa_align($files,$refs);
+		if($options{Qsub}==1){
+			my $cmd = "/home/ksieber/scripts/BWA_aligner.pl";	
+			if($options{input_list}){
+				$options{input} = $files;										## If we are in the orignal call, we need to make sure to qsub a single input
+			}
+			foreach my $key (keys %options){
+				next if($options{input_list} && $key=~/input_list/);			## If we are in the orignal call, we don't want to qsub more lists
+				next if ($key=~/Qsub/ && !$options{input_list});			## If we are in the orignal call with input_list, we probably want to qsub each input
+				if($options{$key}){$cmd = $cmd." --$key=$options{$key}"};		## Build the command for all other options passed in @ original call
+			}
+	        my $files =~ /(\w{1,10})$/;                                             ## Grab the last 1-10 character of the input name to use as the job_name
+	        my $job_name = $options{name} ? $options{name} : $1;
+	        Qsub2({
+	        	cmd => $cmd,
+	        	threads => "$threads",
+	        	mem => "$sub_mem",
+	        	wd => "$options{output_dir}",
+	        	name => "$job_name",
+	        	project => "$project",
+	        	});
+	        next;
+		} else {
+			bwa_align($files,$refs);
+		}
 	}
 }
 

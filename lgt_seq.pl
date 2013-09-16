@@ -160,7 +160,6 @@ foreach my $input (@$inputs){
             name => "$job_name",
 			project => "$lgtseek->{project}",
 			});
-		sleep 20;
 		next;
 	}
 

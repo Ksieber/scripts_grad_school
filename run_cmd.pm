@@ -84,7 +84,7 @@ sub Qsub {
 	if($cmd=~/\.sh$/){
 		$qsub="qsub -V -P jdhotopp-lab $cmd";
 	} else {
-		$qsub="echo $cmd | qsub -V -P jdhotopp-lab";
+		$qsub="echo \"$cmd\" | qsub -V -P jdhotopp-lab";
    	}
    	chomp(my $report = `$qsub`);
    	if($?){
@@ -145,6 +145,7 @@ sub Qsub2 {
    		die "$que died with message: $report\n";
    	}
    	print $fh "QSUB: $report\n";
+   	sleep 2;
    	return $report;
  }
   

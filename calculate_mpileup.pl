@@ -25,7 +25,7 @@ if($options{help}){die
     "HELP: This script will take a bam file and calculate the coverage.
         --input=         	Input bam (Position sorted already)
         --input_list=     	List of bams to process.
-        --sort=			<0|1> [0] 1= Input needs to be position sorted. 
+        --sort=			<0|1> [0] 1= Sort by position. In order to calc. mpilupe input must be position sorted.
         --output_prefix=  	[filename] Prefix for the output file.
         --output_dir=    	Name the directory for output.  
         --region=         	chr1:100-200. Use to look @ reads only in this region. Highly recommended to use.
