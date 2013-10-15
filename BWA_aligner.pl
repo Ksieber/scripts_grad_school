@@ -1,10 +1,9 @@
 #!/usr/local/bin/perl
 use strict;
 use File::Basename;
-use lib '/home/ksieber/scripts/';
+use lib ('/home/ksieber/scripts/','/local/projects-t3/HLGT/scripts/lgtseek/lib');
 use run_cmd;
 use setup_input;
-use setup_output;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 our %options;
 our $results = GetOptions (\%options,                       
@@ -25,6 +24,7 @@ our $results = GetOptions (\%options,
                         'mapped_only=s',
                         'cmd_log=s',
                         'Qsub=s',
+                        'name=s',
                         'project=s',
                         'sub_mem=s',
                         'help|h',
@@ -57,23 +57,26 @@ if ($options{help_full}) {die "\nHELP: This script will align the input (fastq/b
 	--insert_metrics=		<0|1> [0] 1= Use Picard to calculate insert size metrics.
 	--Qsub=				<0|1> [0] 1= qsub the mapping to SGE grid.
 	  --threads=				< # >   [1] Set the number of cpu threads to use for bwa aln steps. USE CAREFULLY.
-	  --project=			[jdhotopp-lab]
+	  --project=			[jdhotopp-lab].
 	  --sub_mem=			[6G] Memory free for qsub.
-	  --name=				Name qsub submission. 
+	  --name=				Name qsub submission.
+	  --wd=					[--output_dir]
 	--cmd_log=			<0|1> [0] 1= Log all commands run in each output_dir/output_prefix.cmd_log	
 	--help\n";
 }
 
 if (!$options{input} && !$options{input_list}) {die "Error: Must give input files to map with --input or --input_list.\n";}
+if (!$options{output_dir}){die "Error: Must use --output_dir=/path/to/output/\n";}
+run_cmd("mkdir -p $options{output_dir}");
 if (!$options{ref} && !$options{ref_list}) {die "ERROR:  Must have enter a reference file to use.\n";}
-my @in_suffix_list=('.bam','_\d+.fastq','.fastq','.fq');  
+my @in_suffix_list=('.bam','.fastq.gz','_\d+.fastq','.fastq','.fq');  
 my @ref_suffix_list=('.fa','.fna','.txt');
-my $threads = $options{t} ? $options{t} : "1";													## Default # of threads = 1
+my $threads = defined $options{t} ? "$options{t}" : "1";													## Default # of threads = 1
 if ($options{mpileup}==1) {$options{sort_index_bams}=1;}										## Mpileup needs a srt.bam, so turn it on automatically if --mpileup is passed
-my $subdirs = $options{subdirs} ? $options{subdirs} : 0;
-my $threads = $options{threads} ? $options{threads} : 1;
-my $project = $options{project} ? $options{project} : "jdhotopp-lab";
-my $sub_mem = $options{sub_mem} ? $options{sub_mem} : "6G";
+my $subdirs = defined $options{subdirs} ? "$options{subdirs}" : "0";
+my $threads = defined $options{threads} ? "$options{threads}" : "1";
+my $project = defined $options{project} ? "$options{project}" : "jdhotopp-lab";
+my $sub_mem = defined $options{sub_mem} ? "$options{sub_mem}" : "6G";
 my @ref_list;
 
 
@@ -92,32 +95,18 @@ if($options{ref_list}){
 
 ## Setup the input list
 my $input=setup_input(\%options);
-
-## Setup output directories
-my $out_dir;
-for my $first_input (@$input[0]){
-	if($first_input=~/\.bam$/){
-		$out_dir=setup_output({input => $input, output_dir => $options{output_dir}, subdirs => $subdirs});
-	}
-	if($first_input=~/\.fq$/ || $first_input=~/\.fastq$/){
-		my @fastq_list;
-		foreach my $fastqs (@$input){
-			my ($file1,$file2)=split(/,/,$fastqs);
-			push(@fastq_list,$file1);
-		}
-		$out_dir=setup_output({ input => \@fastq_list, output_dir => $options{output_dir}, subdirs => $subdirs});
-	}
-}	
-
-## Setup Command logs
-my $cmd_logs; 
-if ($options{cmd_log}==1) {
-	$cmd_logs=setup_logs($out_dir);
-}
   		
 ## Run BWA
 foreach my $files (@$input){
 	foreach my $refs (@ref_list){
+		if($subdirs==1){
+				my ($f1,$f2)=split(/,/,$files);
+				$f1=~/\/(\w+)\.\w+$/;
+				my $name = defined $options{output_prefix} ? $options{output_prefix} : $1;
+				run_cmd("mkdir -p $options{output_dir}"); 						## Make sure we have the original output_dir
+				$options{output_dir} = "$options{output_dir}/"."$name/"; 		## Add the subdir to the output_dir name
+				run_cmd("mkdir -p $options{output_dir}");						## Make the subdir if we need to
+		}
 		if($options{Qsub}==1){
 			my $cmd = "/home/ksieber/scripts/BWA_aligner.pl";	
 			if($options{input_list}){
@@ -128,10 +117,10 @@ foreach my $files (@$input){
 				next if ($key=~/Qsub/ && !$options{input_list});			## If we are in the orignal call with input_list, we probably want to qsub each input
 				if($options{$key}){$cmd = $cmd." --$key=$options{$key}"};		## Build the command for all other options passed in @ original call
 			}
-	        my $files =~ /(\w{1,10})$/;                                             ## Grab the last 1-10 character of the input name to use as the job_name
-	        my $job_name = $options{name} ? $options{name} : $1;
+	        my $files =~ /(\S{1,10}).(\w+)$/;                                             ## Grab the last 1-10 character of the input name to use as the job_name
+	        my $job_name = defined $options{name} ? "$options{name}" : "$1";
 	        Qsub2({
-	        	cmd => $cmd,
+	        	cmd => "$cmd",
 	        	threads => "$threads",
 	        	mem => "$sub_mem",
 	        	wd => "$options{output_dir}",
@@ -153,7 +142,7 @@ sub bwa_align {
 	my $file1;																## Global input file name
 	my $file2;																## Global input file name2
 	my $bam;     															## 0=fastq, 1=bam
-	if($files=~/.fq$/ || $files=~/.fastq$/){
+	if($files=~/.fq$/ || $files=~/.fastq$/ || $files=~/.fastq.gz$/){
 		($file1,$file2)=split(/,/,$files);
 		if($file2!~/\w+/){$file2=$file1;}
 		$bam=0;
@@ -168,13 +157,13 @@ sub bwa_align {
 	## Setup log
 	my $log;
 	if($options{cmd_log}==1){
-		$log=$cmd_logs->{$file1};
+		$log="$options{output_dir}/log.txt";
 	}
 	
 	## Setup output prefix (path/file-name).bam
 	my ($input,$path,$suf)=fileparse($file1,@in_suffix_list);
 	my $out = $options{output_prefix} ? "$options{output_prefix}" : "$input\_at_$ref_name";
-	my $dir = $out_dir->{$file1}->{dir}; 
+	my $dir = $options{output_dir};
 	if ($dir=~/\/\/$/){$dir =~s/\/$//g;}
   	my $output_prefix= "$dir\/$out";
   	
