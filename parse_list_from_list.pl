@@ -1,5 +1,6 @@
 #!/usr/bin/perl
 use warnings;
+no warnings 'uninitialized';
 use strict;
 use lib qw(/local/projects-t3/HLGT/scripts/lgtseek/lib/ /opt/lgtseek/lib/);      ### May need to change this depending on where the script is being run
 use LGTSeek;
@@ -25,12 +26,11 @@ if($options{help}){die "Help: This script will parse out the good or bad lines(i
 		--output_prefix=
 		--output_suffix=
 		--output_name=
+		# If no --output given, output => *STDOUT
 		--help.\n"
 		};
 
-my $lgtseek = LGTSeek->new2({
-	options => \%options,
-	});
+my $lgtseek = LGTSeek->new2(\%options);
 
 if(!$lgtseek->{input_list}){die "Must give a list to parse for desired reads. use --input_list=<LIST>\n";}
 if(!$lgtseek->{good_list} && !$lgtseek->{bad_list}){die "Must pass a --good_list or --bad_list. Try again\n";}
@@ -47,8 +47,15 @@ my $prefix = $lgtseek->{output_prefix} ? $lgtseek->{output_prefix} : $fn;
 my $suffix = $lgtseek->{output_suffix} ? $lgtseek->{output_suffix} : "_filtered.list";
 my $out_fn = $lgtseek->{output_name} ? $lgtseek->{output_name} : "$prefix$suffix";
 my $out = "$out_dir$out_fn";
+
 open(my $ifh, "<","$lgtseek->{input_list}") or die "Can't open input_list: $lgtseek->{input_list} because: $!\n";
-open(my $ofh, ">", "$out") or die "Can't open output: $out because: $out\n";
+my $ofh; 
+if($lgtseek->{output_dir} || $lgtseek->{output_prefix} || $lgtseek->{output_suffix} || $lgtseek->{output_name}){
+	open($ofh, ">", "$out") or die "Can't open output: $out because: $out\n";
+} else {
+	$ofh = *STDOUT;
+}
+
 while(<$ifh>){
 	chomp;
 	if( $lgtseek->{good_list} && $good_ids->{$_}){print $ofh "$_\n";}
@@ -56,4 +63,4 @@ while(<$ifh>){
 }
 close $ifh;
 close $ofh;
-print STDERR "Completed parsing: $lgtseek->{input_list} for lines from:$lgtseek->{good_list} $lgtseek->{bad_list}.\n";
+print STDERR "Completed parsing: $lgtseek->{input_list} for lines from:"."$lgtseek->{good_list}"."$lgtseek->{bad_list}".".\n";
