@@ -6,7 +6,7 @@ lgt_search.pl
 
 =head1 SYNOPSIS
 
-Search an hg19.bam against human and bacteria for LGT.
+Search an hg19.bam against for bacterial LGT.
 
 =head1 DESCRIPTION
 
@@ -35,6 +35,7 @@ my $results = GetOptions (\%options,
 		'input=s', # Comma separated list of files
 		'input_list=s',
 		'Qsub=s',
+		'job_name=s',
 		'decrypt=s',
 		'url=s',
 		'prelim_filter=s',
@@ -62,6 +63,7 @@ my $results = GetOptions (\%options,
 		'clovr=s',
 		'diag=s',
 		'fs=s',
+		'verbose=s',
 		'help|h',
 		'help_full'
 		);
@@ -69,7 +71,6 @@ my $results = GetOptions (\%options,
 if($options{help}){die "Help: This script will identify bacterial human LGT.
 		--input=			<Input BAM>
 		--output_dir=			Directory for all output. Will be created if it doesn't exist. 
-		--subdirs=			<0|1> [0] 1= Make a sub-directory in output_dir based on input name
 		--help_full 			Help Full Info\n";
 }
 
@@ -78,25 +79,21 @@ if($options{help_full}){die "Help: This script takes a bam and identifies bacter
 		--input=			<Input BAM>
 		--input_list=			<List of BAMS> 1 per line.
 		----------------------------------------------------------------------------------------
-		--decrypt= 			<0|1> [0] 1= Decrypt the input bam with a key downloaded from --url=
-		  --url=			The url to download the decryption key from.
-		----------------------------------------------------------------------------------------
-		--name_sort_input=		<0|1> [0] 1= Resort input bam by read name. 
-		--prelim_filter=		<0|1> [0] 1= Filter out human M_M reads from original input.
-		  --keep_softclip=		<0|1> [1] 1= Keep reads that are softclipped >=24 bp. 
-		--split_bam=			<0|1> [1] 1= Split bam into --seqs_per_file chunks. 
-		  --seqs_per_file=		[50000000] (50 Million)
-		----------------------------------------------------------------------------------------
-		--split_bac_list=		Path to the list of split bacterial references (A2D, E2P, R2Z)
-		--hg19_ref=			Path to hg19 reference
-		--refseq_list=			Path to all bacterial references in refseq. 
-		----------------------------------------------------------------------------------------
 		--output_dir=			Directory for all output. Will be created if it doesn't exist. 
 		  --subdirs=			<0|1> [0] 1= Make a sub-directory in output_dir based on input name
 		----------------------------------------------------------------------------------------
+		--map_human=		<0|1> [1] 1= Map the input @ hg19 before LGTFINDER.
+		--hg19_ref=			Path to hg19 reference
+		----------------------------------------------------------------------------------------
+		--prelim_filter=		<0|1> [1] 1= Filter a human mapped bam, keeping potential LGT & Microbiome reads.
+		----------------------------------------------------------------------------------------
+		--split_bac_list=		Path to the list of split bacterial references (A2D, E2P, R2Z)
+		--refseq_list=			Path to all bacterial references in refseq. 
+		----------------------------------------------------------------------------------------
 		--Qsub=				<0|1> [0] 1= qsub the job to the grid.
+		  --threads=			[1] # of CPU's to use for multithreading BWA sampe
+		  --job_name=			[(w+)[1..10]$] Must start with a letter character
 		  --project=			[jdhotopp-lab] Grid project to use. 
-		--threads=			[1] # of CPU's to use for multithreading BWA sampe 
 		----------------------------------------------------------------------------------------
 		--lgt_coverage=			<0|1> [0] 1= Calculate coverage of hg19 LGT. 
 		----------------------------------------------------------------------------------------
@@ -110,8 +107,11 @@ if($options{help_full}){die "Help: This script takes a bam and identifies bacter
 		--clovr=			<0|1> [0] 1= Use clovr defaults for file paths 
 		--diag=				<0|1> [0] 1= Use diag node defaults for file paths 
 		----------------------------------------------------------------------------------------
+		--verbose			<0|1> [1] 1= Verbose reporting of progress. 0 =Turns off reports. 
 		--help				Help Basic Info
 		--help_full 			Help Full Info
+		## Mapping Workflow:
+		## input -> 1=map_human -> 1=prelim_filter -> always=map_bacteria -> LGTFINDER
 		----------------------------------------------------------------------------------------\n";
 }
 
@@ -119,10 +119,10 @@ if($options{help_full}){die "Help: This script takes a bam and identifies bacter
 if(!$options{input} && !$options{input_list}){die "Error: Please give an input.bam with --input=<FILE> or --input_list=<LIST>. Try again or use --help_full.\n";}
 if(!$options{output_dir}){print "It is HIGHLY recommended you STOP, restart, and use a --output_dir=<some/where/>.\n";sleep 60;}
 
+$options{name_sort_input} = defined $options{name_sort_input} ? "$options{name_sort_input}" : "0";
+
 ## Setup Default paths for references and bins:
-my $lgtseek = LGTSeek->new2({
-	options => \%options,
-	});
+my $lgtseek = LGTSeek->new2(\%options);
 
 my $inputs = setup_input(\%options);
 
@@ -137,8 +137,13 @@ foreach my $input (@$inputs){
 	if($lgtseek->{decrypt}==1 && !$lgtseek->{url}){die "Error: Must give a --url to use --decrypt.\n";}
 	my ($name,$path,$suf)=fileparse($input,('.gpg.bam','_prelim.bam','.bam'));
 	chomp $name;
+	## Setup output directory
 	if(!$lgtseek->{output_dir}){$lgtseek->{output_dir}="$path/lgtseq/";}
-	if($lgtseek->{subdirs}==1){$lgtseek->_run_cmd("mkdir -p $lgtseek->{output_dir}"); $lgtseek->{output_dir} = "$options{output_dir}/"."$name/";}
+	if($lgtseek->{subdirs}==1){
+		$lgtseek->_run_cmd("mkdir -p $lgtseek->{output_dir}"); 
+		$lgtseek->{output_dir} = "$options{output_dir}/"."$name/"; 
+		$lgtseek->_run_cmd("mkdir -p $lgtseek->{output_dir}");
+	}
 
 	## Qsub the job instead of running it
 	if($lgtseek->{Qsub}==1){
@@ -152,17 +157,16 @@ foreach my $input (@$inputs){
 			if($options{$key}){$cmd = $cmd." --$key=$options{$key}"};		## Build the command for all other options passed in @ original call
 		}
         $name =~ /(\w{1,10})$/;                                             ## Grab the last 1-10 character of the input name to use as the job_name
-        my $job_name = $1;
+        my $job_name = defined $options{job_name} ? "$options{job_name}" : "$1";
 		Qsub2({
 			cmd => $cmd,
 			threads => "$lgtseek->{threads}",
-			wd => "$options{output_dir}",
+			wd => "$lgtseek->{output_dir}",
             name => "$job_name",
 			project => "$lgtseek->{project}",
 			});
 		next;
 	}
-
 
 	## Log lgt_seq.pl command to STDERR 
 	my $print = "lgt_seq.pl";
@@ -173,57 +177,49 @@ foreach my $input (@$inputs){
 	print STDERR "++++++++  LGT-SEQ  +++++++++\n";
 	print STDERR "++++++++++++++++++++++++++++\n\n";
 
-	## This isn't going to work as is NEED TO FIX!!!!!! or remove ...
-
-	# # Get input ready for processing with decryption and/or prelim filtering
-	# print STDERR "=========PREP-INPUT========\n";
-	# my $input_bam;
-	# if($lgtseek->{decrypt}==1){
-	# 	$input_bam = $lgtseek->decrypt({								## Decrypt .gpg.bam with the key downloaded from --url=<URL>. Ideal for on diag nodes.
-	# 		input => $input,
-	# 		url => $lgtseek->{url},
-	# 		output_dir => $lgtseek->{output_dir}
-	# 		});
-	# } elsif ($lgtseek->{prelim_filter}==1) {							## Preliminary filter input bam. 
-	# 	my $unfiltered_bam;												## Primaryly used to remove previously human M_M reads. 
-	# 	if ($lgtseek->{decrypt}==1){ $unfiltered_bam = $input_bam; }	## This can also resort by name instead of position (probably needed)
-	# 	else { $unfiltered_bam = $input; }								## By default keeps soft clipped human M_M reads (potentially on LGT)
-	# 	my $bams_array_ref = $lgtseek->prelim_filter({					## By default it also splits output into smaller chunks of 50M. 
-	# 		input_bam => $unfiltered_bam,
-	# 		output_dir => "$lgtseek->{output_dir}/prelim_filter/",
-	# 		overwrite => 0,
-	# 		});
-	# 	$input_bam = ${$bams_array_ref}[0];
-	# } else { 
-	# 	$input_bam = $input; 
-	# }
-	# print STDERR "=========INPUT-READY=======\n";
 	
 	my $input_bam = $input; 
-	
-	# Align to the donors.
-	print STDERR "========RUNBWA-DONOR========\n";
-	my $donor_bams = $lgtseek->runBWA({
-		input_bam => $input_bam,
-		output_bam => 1,
-		threads => $lgtseek->{threads},
-		output_dir => "$lgtseek->{output_dir}/donor_alignments/",
-		reference_list => $lgtseek->{split_bac_list},
-		overwrite => 0,   
-		cleanup_sai => 1,
-		});
+	my $human_bam;
+	# Align to Human.
+	if($lgtseek->{map_human}==1){ print STDERR "========RUNBWA-DONOR========\n";
+		$human_bam = $lgtseek->runBWA({
+			input_bam => $input_bam,
+			output_bam => 1,
+			threads => $lgtseek->{threads},
+			output_dir => "$lgtseek->{output_dir}/human_alignments/",
+			reference_list => $lgtseek->{hg19_ref},
+			overwrite => $lgtseek->{overwrite},   
+			cleanup_sai => 1,
+			});
+		time_check();
+	} else {
+		$human_bam = $input;
+	}
 
-	time_check();
+	# Prelim_filter
+	if($lgtseek->{prelim_filter}==1 || $lgtseek->{split_bam}==1 || $lgtseek->{name_sort_input}==1){
+		$prelim_filtered_bam = $lgtseek->prelim_filter({
+			input_bam => $human_bam,
+			output_dir => "$lgtseek->{output_dir}/prelim_filter/",
+			name_sort_input => $lgtseek->{name_sort_input},				## Default = 1
+			sort_mem => $lgtseek->{sort_mem},							## Default = 10G lgtseek default. lgt_prep overides to 40G. 
+			split_bam => 0,												## Default = 1
+			keep_softclip => $lgtseek->{keep_softclip},					## Default = 1
+			overwrite => $lgtseek->{overwrite},							## Default = 0
+			});
+	}
+
+	# Make redo human mapping
 
 	# Align to the hosts.
 	print STDERR "========RUNBWA-HOST========\n";
-	my $host_bams = $lgtseek->runBWA({
+	my $bacterial_bams = $lgtseek->runBWA({
 		input_bam => $input_bam,
 		output_bam => 1,
 		threads => $lgtseek->{threads},
-		output_dir => "$lgtseek->{output_dir}/host_alignments/",
-		reference => $lgtseek->{hg19_ref},
-		overwrite => 0, 
+		output_dir => "$lgtseek->{output_dir}/bacterial_alignments/",
+		reference =>  $lgtseek->{split_bac_list},
+		overwrite => $lgtseek->{overwrite}, 
 		cleanup_sai => 1,   
 		});
 	time_check();
@@ -231,17 +227,17 @@ foreach my $input (@$inputs){
 	# Postprocess the results
 	print STDERR "=======POSTPROCESS=======\n";
 	my $pp_data = $lgtseek->bwaPostProcess({
-		donor_bams => $donor_bams,
-		host_bams => $host_bams,
+		donor_bams => $bacterial_bams,
+		host_bams => $human_bam,
 		output_prefix => $name,
-		overwrite => 0,   
+		overwrite => $lgtseek->{overwrite},   
 		});
 	time_check();
 	# Clean up output we don't need anymore; This is IMPORTANT on nodes.
-	print STDERR "RM: $lgtseek->{output_dir}/host_alignments/\n";
-	print STDERR $lgtseek->_run_cmd("rm -rf $lgtseek->{output_dir}/host_alignments/");
-	print STDERR "RM: $lgtseek->{output_dir}/donor_alignments/\n";
-	print STDERR $lgtseek->_run_cmd("rm -rf $lgtseek->{output_dir}/donor_alignments/");
+	print STDERR "RM: $lgtseek->{output_dir}/human_alignments/\n";
+	print STDERR $lgtseek->_run_cmd("rm -rf $lgtseek->{output_dir}/human_alignments/");
+	print STDERR "RM: $lgtseek->{output_dir}/bacterial_alignments/\n";
+	print STDERR $lgtseek->_run_cmd("rm -rf $lgtseek->{output_dir}/bacterial_alignments/");
 
 	# Create file with number of counts
 	my @header = ('run_id');
@@ -251,7 +247,7 @@ foreach my $input (@$inputs){
 		push(@header,$_);
 		my $foo = $pp_data->{counts}->{$_} ? $pp_data->{counts}->{$_} : 0;
 		push(@vals,$foo);
-	} ('total','host','no_map','all_map','single_map','integration_site_host','integration_site_donor','microbiome','lgt');
+	} ('total','host','no_map','all_map','single_map','integration_site_human','integration_site_bac','microbiome','lgt');
 	&print_tab("$lgtseek->{output_dir}/$name\_post_processing.tab",\@header,\@vals);
 
 
@@ -282,7 +278,7 @@ foreach my $input (@$inputs){
 			reference_list => "$lgtseek->{refseq_list}",
 			threads => $lgtseek->{threads},
 			run_lca => 1,
-			overwrite => 0,
+			overwrite => $lgtseek->{overwrite},
 			cleanup_sai => 1,
 			});
 		# Make LGT Fasta for Blast validation
@@ -303,7 +299,7 @@ foreach my $input (@$inputs){
 			});
 		time_check();
 
-		# Now run lgtfinder
+		# lgtfinder
 		print STDERR "========LGTFINDER=========\n";
 		my $valid_lgts = $lgtseek->runLgtFinder({
 			lineage1 => $lgtseek->{donor_lineage},
@@ -314,7 +310,7 @@ foreach my $input (@$inputs){
 			});
 		time_check();
 
-		# Run blast and keep raw output ?
+		# Run blast and keep raw output
 		my $blast_ret = $lgtseek->_run_cmd("blastall -p blastn -e 10e-5 -T F -d $lgtseek->{path_to_blastdb} -i $lgt_fasta > $lgtseek->{output_dir}/blast_validation/$name\_blast.raw");
 		
 		## Cleanup Intermediate Files
@@ -351,7 +347,7 @@ foreach my $input (@$inputs){
 			reference_list => "$lgtseek->{refseq_list}",
 			threads => $lgtseek->{threads},
 			run_lca => 1,
-			overwrite => 0,
+			overwrite => $lgtseek->{overwrite},
 			cleanup_sai => 1,
 			});
 
@@ -370,7 +366,7 @@ foreach my $input (@$inputs){
 			output_dir => $lgtseek->{output_dir},
 			ref => $lgtseek->{hg19_ref},
 			cleanup => 1,
-			overwrite => 0,
+			overwrite => $lgtseek->{overwrite},
 			});
 		time_check();
 	}

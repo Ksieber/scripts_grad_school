@@ -61,6 +61,7 @@ if($A==0){
 
 
 my $input = setup_input(\%options);
+run_cmd("mkdir -p $options{output_dir}");
 
 foreach my $bam (@$input){
 	my ($filename,$directory) = fileparse($bam, ('.srt.bam','.bam'));

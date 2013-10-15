@@ -101,15 +101,17 @@ if($options{min_max}){
 		$chr_max{$keys}=$override_max;
 	}
 }
+
 if($options{chr_min_max}){
-	$options{chr_min_max}=~/(.+)\:(\d+)\-(\d+)$/;
+	$options{chr_min_max}=~/^(\w+)\:(\d+)\-(\d+)$/;
 	$override_chr = $1;
 	$override_min=$2;
 	$override_max=$3;
-	if($override_chr !~ keys %chr_min){die "ERROR: The chr you specified wasn't seen.\n";}
+	if(!$chr_min{$override_chr}){die "ERROR: The chr you specified wasn't seen.\n";}
 	$chr_min{$override_chr}=$override_min;
 	$chr_max{$override_chr}=$override_max;
 	print STDERR "$override_chr\t$chr_min{$override_chr}\t$chr_max{$override_chr}\n";
+	
 }
 #foreach my $k (keys %chr_min){
 #    print STDERR "MIN:$chr_min{$k}\tMAX:$chr_max{$k}\n";

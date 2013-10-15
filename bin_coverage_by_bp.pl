@@ -19,7 +19,7 @@ if($options{help}){
 if(!$options{vcf}){die "ERROR: Must give an input file. Use --vcf= name of the input mpileup file.\n";}
 my %cov;
 $options{vcf} =~ m/(\w+)\.\w+$/;
-my $out = $options{output_prefix} ? $options{output_prefix} : $1;
+my $out = defined $options{output_prefix} ? "$options{output_prefix}" : "$1";
 open(OUT, ">", "$options{output_dir}./$out\.bin_cov") or die "ERROR: Unable to open output: $options{output_dir}/$out\.bin_cov because: $!\n";
 
 open(IN, "<", "$options{vcf}") or die "ERROR: Unable to open input vcf: $options{vcf} because: $!\n";

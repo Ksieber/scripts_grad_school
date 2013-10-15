@@ -1,5 +1,6 @@
 #!/usr/bin/perl
 use warnings;
+no warnings 'uninitialized';
 use strict;
 use lib qw(/local/projects-t3/HLGT/scripts/lgtseek/lib/ /opt/lgtseek/lib/);      ### May need to change this depending on where the script is being run
 use LGTSeek;
@@ -13,6 +14,7 @@ my $results = GetOptions (\%options,
 	'input=s',
 	'input_list=s',
 	'output_dir=s',
+	'output_name=s',
 	'subdirs=s',
 	'help',
 	);
@@ -22,10 +24,11 @@ if($options{help}){
 	This script will merge the output files of lgt_seq.pl.
 	----------------------------------------------------------------------------------------
 	--input=		Directory to merge files from. Subdirectories in this directory should contain lgt_seq.pl outputs.
-	--input_list=	List of input directories.
+	--input_list=		List of input directories.
 	----------------------------------------------------------------------------------------
-	--output_dir=	Directory for output.
-	  --subdirs=		Make a new directory within output_dir for each input directory.
+	--output_dir=		Directory for output.
+	  --subdirs=		<0|1> [0] 1= Make a new directory within output_dir for each input directory.
+    --output_name=      Prefix name for the merged output. [Input dir name]
 	----------------------------------------------------------------------------------------
 	--help
 	----------------------------------------------------------------------------------------\n";
@@ -33,6 +36,7 @@ if($options{help}){
 
 if(!$options{input} && !$options{input_list}){die "Must give an input. Use --input or --input_list\n";}
 if(!$options{output_dir}){die "Must use --output_dir=\n";}
+my $subdirs = defined $options{subdirs} ? "1" : "0";
 my $input = setup_input(\%options);
 run_cmd("mkdir -p $options{output_dir}");
 
@@ -58,19 +62,19 @@ my @txt_suffix_to_merge = (
 		);
 
 foreach my $dir (@$input){
-	$dir =~ /\/(\w+)\/$/;
-	my $name = $1;
+    $dir =~ /\/(\w+)\/*$/;
+	my $name = defined $options{output_name} ? $options{output_name} : $1;
 	my $output_dir;
-	if($options{subdirs}){
+	if($subdirs==1){
 		run_cmd("mkdir -p $options{output_dir}/$name");
 		$output_dir="$options{output_dir}/$name";
 	} else {
 		$output_dir="$options{output_dir}";
 	}
-
+	print STDERR "Input_dir: $dir\nInput_name: $name\nOutput_dir: $output_dir\n";
 	foreach my $txt_suffix (@txt_suffix_to_merge){
 		chomp(my @list_to_merge = `find $dir -name '*$txt_suffix'`);
-		my $output = "$options{output_dir}/$name\_$txt_suffix";
+		my $output = "$output_dir/$name\_$txt_suffix";
 		foreach my $file (@list_to_merge){
 			run_cmd("cat $file >> $output");
 		}
@@ -78,11 +82,17 @@ foreach my $dir (@$input){
 
 	foreach my $bam_suffix (@bam_suffix_to_merge){
 		chomp(my @list_to_merge = `find $dir -name '*$bam_suffix'`);
-		my $output = "$options{output_dir}\/$name\_$bam_suffix";
-		my $header = run_cmd("samtools view -H $list_to_merge[0]");
+		my $output = "$output_dir/$name\_$bam_suffix";
+		my $header = undef;																## Trying to come up with a way to grab a header while checking to make sure at least 1 file has data in it. 
+		for(my $i=0; $i< scalar @list_to_merge; $i++){										
+			next if(`samtools view $list_to_merge[$i] | head | wc -l`==0);				## Skip the bam if it is empty
+			$header = run_cmd("samtools view -H $list_to_merge[$i]");					## else grab the header
+		}
+		next if($header !~/\S+/);														## If none of the bams in the @list_to_merge have data header should be undef still and we skip this suffix
 		open(my $out, "| samtools view -S - -bo $output") or die "Can not open output: $output\n";		
 		print $out "$header\n";
 		foreach my $bam (@list_to_merge){
+			next if (`samtools view $bam | head | wc -l`==0);
 			open(my $in, "-|","samtools view $bam") or die "Can not open input: $bam\n";
 			while(<$in>){
 				print $out "$_";
@@ -91,4 +101,5 @@ foreach my $dir (@$input){
 		}
 		close $out or die "Can't close output: $output because: $!\n";
 	}
+    print STDERR "======Completed merging: $dir======\n"
 }

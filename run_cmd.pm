@@ -99,16 +99,19 @@ sub Qsub {
 =head2 Qsub2 
 	Title		: Qsub2
 	Usage		: Qsub2({ cmd => $cmd, threads => $threads });
-	Function	: qsub commands with better control than Qsub
+	Function	: More verbose version of qsub.
 	Args	:
-		cmd 	=> command/shell script to be qsub'ed
-		log 	=> file to log in
-		name	=> Job Name
-		threads	=> # cpu threads to use
-		mem		=> min amount of RAM to use
-	 	project	=> grid project to use
-		cwd		=> <0|1> [0]
-		wd 		=> Directory for grid to work from
+		cmd 	 	=> command/shell script to be qsub'ed
+		log 	 	=> file to log the qsub command in.
+		name	 	=> Job Name.
+		threads	 	=> # cpu threads to use.
+		mem		 	=> Memory free @ start.
+	 	project	 	=> grid project to use.
+		cwd		 	=> <0|1> [0] 1= Use current working directory to work from.
+		wd 		 	=> Directory for grid to work from.
+		hostname 	=> Hostname to run on. ex: => "grid*"
+		no_gal	 	=> <0|1> [0] 1= Don't run on galactus. ie hostname="magneto|juggernaut|grid*"
+		excl		=> <0|1> [0] 1= Run exclusively on a node.
 =cut 
 
 sub Qsub2 {
@@ -116,21 +119,30 @@ sub Qsub2 {
  	if(!$config->{cmd}){die "Must use cmd => <Command to qsub>. Please Fix.\n";}
  	my $cmd = $config->{cmd};
  	my $log = $config->{log};
- 	my $wd = $config->{wd} ? " -wd $config->{wd}" : undef;
+ 	my $wd = defined $config->{wd} ? " -wd $config->{wd}" : undef;
  	my $threads=undef;
- 	my $t = $config->{threads} ? $config->{threads} : 1;
+ 	my $t = defined $config->{threads} ? $config->{threads} : 1;
  	if($t>=2){$threads = " -pe thread $t -q threaded.q";}
- 	my $mem = $config->{mem} ? " -l mf=$config->{mem}" : undef;
- 	my $project = $config->{project} ? " -P $config->{project}" : " -P jdhotopp-lab";
- 	my $cwd = $config->{cwd} ? " -cwd" : undef;
-    my $name = $config->{name} ? " -N $config->{name}" : undef;
+ 	my $mem = defined $config->{mem} ? " -l mf=$config->{mem}" : undef;
+ 	my $project = defined $config->{project} ? " -P $config->{project}" : " -P jdhotopp-lab";
+ 	my $cwd = defined $config->{cwd} ? " -cwd" : undef;
+    my $name = defined $config->{name} ? " -N $config->{name}" : undef;
+    my $hostname = defined $config->{hostname} ? " -l hostname=\"$config->{hostname}\"" : undef;
+    if($config->{no_gal}==1){$hostname= " -l hostname=\"magneto|juggernaut|grid*\"";}
+    my $exclusive;
+    if($config->{excl}==1){
+    	$exclusive = " -l excl=true";
+    } else {
+    	$exclusive = undef;
+    }
+    print STDERR "exclusive\t$config->{excl},\t$exclusive.\n";
  	my $fh;
  	if($log){
    		open($fh,">>","$log") or die "Can't open: $fh because: $!\n";
 	} else { 
 		$fh = *STDERR;
 	}
-	my $qsub = "qsub -V$name$project$wd$cwd$mem$threads";
+	my $qsub = "qsub -V$name$project$wd$cwd$mem$threads$hostname$exclusive";
 	print $fh "QSUB: echo \"$cmd\" | $qsub\n";
 	my $que;
 	if($cmd=~/\.sh$/){

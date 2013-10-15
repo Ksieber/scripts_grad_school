@@ -28,7 +28,7 @@ if($options{help}){ die
 }
 
 if(!$options{input} && !$options{input_list}){die "Must give an --input=<BAM> or --input_list=<list_of_bams>\n";}
-my $append = $options{append} ? $options{append} : 0;
+my $append = defined $options{append} ? "$options{append}" : "0";
 
 my $lgtseek = LGTSeek->new2(\%options);
 

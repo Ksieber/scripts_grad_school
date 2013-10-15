@@ -56,7 +56,7 @@ if($options{help}){die "Help: This script will takes a bam and identifies bacter
 		--path_to_blastdb=
 		--clovr=				<0|1> [0] 1=Use clovr defaults for file paths 
 		--diag=					<0|1> [0] 1=Use diag node defaults for file paths 
-		--fs=					<0|1> [0] 1=Use filesystem defaults for file paths 
+		--fs=					<0|1> [1] 1=Use filesystem defaults for file paths 
 		--bin_dir=
 		--samtools_bin=
 		--ergatis_bin=
