@@ -1,5 +1,7 @@
-#!/usr/local/bin/perl/ -w
+#!/usr/bin/perl
 use strict;
+use warnings;
+no warnings 'uninitialized';
 
 use Getopt::Long qw (:config no_ignore_case no_auto_abbrev);
 my %options;
@@ -64,8 +66,9 @@ open(LCA, "<", $options{lca_file}) or die "ERROR: Couldn't open the lca file: $o
 print STDERR "Starting to read through the LCA file, parsing for the desired reads . . .\n";
 while(<LCA>){
    chomp;
-   my ($read,$lca)=split(/\t/,$_);
-   $read=~s/_(1|2)$//;
+   my @line=split(/\t/,$_);
+   my $read = $line[0];
+   if($read=~/_(1|2)$/){$read=~s/_(1|2)$//;}
 #print STDERR "READ:$read\tLCA:$lca\n";  ## Working
    if($options{bam_file} || $options{good_list}){
       if($mapped_reads{$read}){

@@ -5,6 +5,7 @@ use warnings;
 use Time::SoFar;
 use File::Basename;
 use LGTSeek;
+use run_cmd;
 use setup_input;
 use lib '/local/projects-t3/HLGT/scripts/lgtseek/lib/';
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
@@ -15,15 +16,18 @@ our $results = GetOptions (\%options,
 	'output_dir=s',
 	'subdirs=s',
 	'append=s',
+	'Qsub=s',
 	'help'
 );
 
 if($options{help}){ die
 	"This script will calculate the number of reads in a bam: Total, MM, MU, UU, SC
 	--input=		<BAM>
-	--input_list=	<list of BAMS>
-	--output_dir=	</path/for/output/>
-	--append=	</path/file/append.txt> Add output stats to this file.
+	--input_list=		<list of BAMS>
+	--append=		</path/file/append.txt> Add output stats to this file.
+	--output_dir=		</path/for/output/>
+	--subdirs=		<0|1> [0] 1= Put output into a subdirectory under --output_dir.
+	--Qsub=			<0|1> [0] 1= Qsub the script. 
 	--help\n";
 }
 
@@ -34,10 +38,40 @@ my $lgtseek = LGTSeek->new2(\%options);
 
 my $input = setup_input(\%options);
 
-foreach my $bam (@$input){
-	if($lgtseek->empty_chk({input => $bam}) ==1){print STDERR "This is an empty bam! $bam\n"; next;}
+foreach my $input (@$input){
+	if($lgtseek->empty_chk({input => $input}) ==1){print STDERR "This is an empty bam! $input\n"; next;}
+	if($lgtseek->{Qsub}==1){
+		## If we are in the orignal call, change input from list to a single file
+		if($options{input_list}){$options{input} = $input;}
+		## Build qsub command
+		my $cmd = "/home/ksieber/scripts/bam2stats.pl"; 
+		foreach my $key (keys %options){
+			next if ($key=~/Qsub/);
+			next if($options{input_list} && $key=~/input_list/);			  ## If we are in the orignal call, we don't want to qsub more lists
+			if(defined $options{$key}){$cmd = $cmd." --$key=$options{$key}"};
+		}
+		my ($fn,$path,$suff)=fileparse($input,('.srt.bam','.name-sort.bam','.pos-sort.bam','.bam'));
+		$fn =~ /(\w{1,10})$/;
+		my $job_name = $1;
+		my $output_dir;
+		if(defined $options{append}){
+			my ($file,$dir,$foo)=fileparse($options{append});
+			$output_dir = $dir;
+		} elsif (defined $options{output_dir}){
+			$output_dir = $options{output_dir};
+		} else {
+			$output_dir=run_cmd("pwd");
+		}
+	    ## submit command to grid
+	    Qsub2({
+	    	cmd => "$cmd",
+	    	wd => "$output_dir",
+	    	});
+		## Skip to next input for qsub
+		next;
+	}
 	my $start = Time::SoFar::runinterval();
-	open(my $in,"-|","samtools view $bam") or die "Can't open input: $bam\n";
+	open(my $in,"-|","samtools view $input") or die "Can't open input: $input\n";
 	## 
 	my @read_types = ('Total','MM','MU','UU','SC');
 	my %counts;
@@ -58,7 +92,7 @@ foreach my $bam (@$input){
 	my $OUT;
 	my $print_header;
 	if($options{output_dir}){
-		my ($fn,$path,$suf)=fileparse($bam,".bam");
+		my ($fn,$path,$suf)=fileparse($input,".bam");
 		my $out = $options{output_dir} ? "$options{output_dir}/$fn.stats" : "$path$fn.stats";
 		open($OUT,"> $out") or die "Error: Can not open: $out\n";
 		$print_header=1;
@@ -73,7 +107,7 @@ foreach my $bam (@$input){
 	##
 	if($print_header==1){print $OUT "BAM\t"; print $OUT join("\t",@read_types)."\n";}
 	##
-	print $OUT "$bam\t"; map { print $OUT "$counts{$_}\t" } @read_types;
+	print $OUT "$input\t"; map { print $OUT "$counts{$_}\t" } @read_types;
 	my $finished = Time::SoFar::runinterval();
 	print $OUT "Time elapsed: $finished\n";
 	close $OUT;

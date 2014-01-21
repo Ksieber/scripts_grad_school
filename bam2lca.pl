@@ -29,27 +29,28 @@ use LGTSeek;
 use Time::SoFar;
 use run_cmd;
 use setup_input;
+use print_call;
 use File::Basename;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
 my $results = GetOptions (\%options,
-		'input=s', # Comma separated list of files
+		'input|i=s', # Comma separated list of files
 		'input_list=s',
-		'Qsub=s',
-		'no_gal=s',
+		'Qsub=i',
+		'no_gal=i',
 		'hostname=s',
 		'job_name=s',
-		'name_sort_input=s',
+		'name_sort_input=i',
 		'refseq_list=s',
-		'output_dir=s',
-		'subdirs=s',
+		'output_dir|o=s',
+		'subdirs=i',
 		'bin_dir=s',
 		'samtools_bin=s',
 		'ergatis_bin=s',
 		'prinseq_bin=s',
 		'donor_lineage=s',
 		'host_lineage=s',
-		'threads=s',
+		'threads|t=i',
 		'taxon_host=s',
 		'taxon_dir=s',
 		'taxon_idx_dir=s',
@@ -98,7 +99,7 @@ foreach my $input (@$inputs){
 
 	## Qsub the job instead of running it
 	if($lgtseek->{Qsub}==1){
-		my $cmd = "/home/ksieber/scripts/bam2lca.pl";					## Start building the cmd to qsub
+		my $cmd = "$^X $0";					## Start building the cmd to qsub
 		if($options{input_list}){
 			$options{input} = $input;										## If we are in the orignal call, we need to make sure to qsub a single input
 		}
@@ -118,10 +119,7 @@ foreach my $input (@$inputs){
 		next;
 	}
 
-	my $print = "bam2lca.pl";
-	foreach my $key (keys %options){if($options{$key}){$print = "$print"." \-\-$key=$options{$key}";}}
-	print STDERR "test: $lgtseek->{output_dir}\n";
-	print STDERR "\n$print\n";
+	print_call(\%options);
 	print STDERR "\n++++++++++++++++++++++++++++\n";
 	print STDERR "+++++++  bam2lca.pl  +++++++\n";
 	print STDERR "++++++++++++++++++++++++++++\n\n";
@@ -145,6 +143,18 @@ foreach my $input (@$inputs){
 }
 
 sub help {die "Help: This script will take bam and find the bwa-lca.
-    --input=
-    --input_list=\n";
+	     _____
+	____/Input\\_________________________________________________________________________________
+		--input=			<Input BAM>
+		--input_list=			<List of BAMS> 1 per line.
+	     ______
+	____/Output\\________________________________________________________________________________
+		--output_dir=			Directory for all output. Will be created if it doesn't exist. 
+	  	  --subdirs=			<0|1> [0] 1= Make a sub-directory in output_dir based on input name
+	     __________________
+	____/Submit to SGE-grid\\_____________________________________________________________________
+		--Qsub=				<0|1> [0] 1= qsub the job to the grid.
+		  --threads=			# of threads to use for bwa sampe.
+		  --job_name=			[(w+)[1..10]$] Must start with a letter character 
+	_____________________________________________________________________________________________\n";
 }

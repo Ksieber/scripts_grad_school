@@ -1,5 +1,6 @@
 #!/usr/local/bin/perl
 use warnings;
+no warnings 'uninitialized';
 use strict;
 use run_cmd;
 use setup_input;
@@ -40,40 +41,36 @@ if(!$options{input} && !$options{input_list}){die "ERROR: Must give an input bam
 if($options{M_M} && $options{M_UM}){die "ERROR: Can only use one: M_M or M_UM at once. Try again.\n";}
 
 ## Setup options
-my $qsub = $options{Qsub} ? $options{Qsub} : 0;
-my $sort = $options{sort} ? $options{sort} : 0;
-my $MM = $options{MM} ? $options{MM} : 0;
-my $MU = $options{MU} ? $options{MU} : 0;
+my $qsub = $options{Qsub} ? $options{Qsub} : "0";
+my $sort = $options{sort} ? $options{sort} : "0";
+my $MM = $options{MM} ? $options{MM} : "0";
+my $MU = $options{MU} ? $options{MU} : "0";
 my $A = $options{A} ? $options{A} : 1;
 my $d = $options{d} ? $options{d} : 100000;
+my $region = defined $options{region} ? "'$options{region}'" : undef;
 my $view = "-hu";              ## Default
 my $mpileup = "-Ad $d";    	   ## Default
 if($MM==1){
     $view = "-huF0xC";
     $mpileup = "-d $d";
 }
-if($MU==1){
-    $view = "-huf0x8 -F0x4";
-}  
-if($A==0){
-    $mpileup = "-d $d";
-}
+if($MU==1){ $view = "-huf0x8 -F0x4"; }  
+if($A==0){ $mpileup = "-d $d"; }
 
 
 my $input = setup_input(\%options);
-run_cmd("mkdir -p $options{output_dir}");
 
 foreach my $bam (@$input){
 	my ($filename,$directory) = fileparse($bam, ('.srt.bam','.bam'));
     my $prefix = $options{output_prefix} ? $options{output_prefix} : $filename;
     my $dir = $options{output_dir} ? $options{output_dir} : $directory;
+    if($dir=~/\w+/){run_cmd("mkdir -p $dir");}
     my $out = "$dir/$prefix";
     my $cmd;
     if($sort==1){
-    	$cmd = "samtools sort -m 5000000000 -o $bam - | samtools view $view - \'$options{region}\' | samtools mpileup $mpileup - > $out\.mpileup"
-    } else {
-    	$cmd = "samtools view $view $bam \'$options{region}\' | samtools mpileup $mpileup - > $out\.mpileup";
- 	}
+    	$cmd = "samtools sort -m 5000000000 -o $bam - | samtools view $view - $region | samtools mpileup $mpileup - > $out\.mpileup"
+    } else {$cmd = "samtools view $view $bam $region | samtools mpileup $mpileup - > $out\.mpileup";}
+    
     if($qsub==1){Qsub($cmd); next;} 
     else {run_cmd($cmd);}
 }	

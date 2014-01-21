@@ -53,6 +53,7 @@ my $results = GetOptions (\%options,
 if($options{help}){&help;}								## @ end of script
 ## Check we have the correct input
 if(!$options{input} && !$options{mpileup}){die "ERROR: Must pass an input file, use --input=<BAM> or --mpileup=<FILE>\n";}
+if($options{input} && $options{mpileup}){die "ERROR: Only pass one input using either --input or --mpileup. Please try again.\n";}
 ## Default values
 my $lgtseek = LGTSeek->new2(\%options);
 my $input = defined $options{input} ? $options{input} : $options{mpileup};
@@ -75,9 +76,9 @@ my $infh;
 if($options{mpileup}){
 	open($infh,"<","$input") || die "ERROR: Can't open: $options{mpileup}.\n";
 } else {
-	open($infh,"-|","samtools mpileup $ref-A $input") || die "ERROR: Can't open: samtools mpileup $ref-A $input\n";
+	open($infh,"-|","samtools mpileup $ref -A $input") || die "ERROR: Can't open: samtools mpileup $ref-A $input\n";
 }
-open(my $OFH,">","$out\.regions-of-coverage.txt") || die "ERROR: Can't open: $out\_regions-of-coverage.txt.\n";
+open(my $OFH,">","$out\_regions-of-coverage.txt") || die "ERROR: Can't open: $out\_regions-of-coverage.txt.\n";
 
 undef my %start_position;
 undef my %previous_position;		## $previous_position{$chr}=start position of region of coverage
@@ -155,12 +156,12 @@ sub print_region {
 
 sub help {
 	die "This script will take a bam file and make a text file with the unique regions of coverage.
-		--input=
-		--mpileup=
-		--min_cov=
-		--pos_sort=
-		--make_bams=
-		--output_dir=
+		--input=			<BAM>
+		--mpileup=			<mpileup of BAM>.
+		--min_cov=			Min. coverage cutoff for regions of interest.
+		--pos_sort=			Sort the input bam.
+		--make_bams=		Make bams for reach region of coverage.
+		--output_dir=		Directory for output.
 		 --output_prefix=
 		 --subdirs=
 		--help\n";

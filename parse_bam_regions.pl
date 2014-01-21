@@ -166,11 +166,9 @@ foreach my $bam (@bam_list){
       `samtools sort -n $outputdir/$output\_regions.bam $outputdir/$output\_regions_sort_names`;
       &errchk($?);
       `rm $outputdir/$output\_regions.bam`;
-      }
-   }
-}  
+    }
+}
 close OUT;
-
 __END__
    
 

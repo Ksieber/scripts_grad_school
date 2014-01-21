@@ -26,20 +26,19 @@ foreach $key (keys%hash) {
     $a++;
     $sum=0;
     $e=0;
-#    print "$key\t$hash{$key}\t$average\t$sum\t$window\n";
+
     for ($i=0; $i<$window; $i++) {
 	if (exists $hash{$i}) {
 	    $sum=$sum+$hash{$key+$i};
 	    $e++;
 	    }
-#	print "$hash{$i}\t$sum\n";
     }
     $average=$sum/$e;
-#    $test=$distance;
-#    if ($a>$test) {
+    $test=$distance;
+    if ($a>$test) {
         print "$key\t$average\n";
-#	$test=$test+$distance;
-#    }
+		$test=$test+$distance;
+    }
 }
 
 __END__
