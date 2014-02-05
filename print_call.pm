@@ -3,7 +3,7 @@ use warnings;
 use strict;
 use Exporter;
 our @ISA = qw(Exporter);
-our @EXPORT = qw( print_call print_complete );
+our @EXPORT = qw( print_call print_complete print_hostname );
 
 =head2 print_call
 	Title		: print_call
@@ -32,4 +32,10 @@ sub print_complete {
 	print STDERR "\n================================================================================================================================\n";
 }
 
+
+sub print_hostname {
+	my $options = shift;
+	print STDERR "================================================================================================================================\n";
+	if($options->{print_hostname}){system("echo =================       HOSTNAME: `hostname` 1>&2");}
+}
 1;

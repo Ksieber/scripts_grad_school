@@ -11,9 +11,9 @@ Search an bam for bacterial-human LGT.
 =head1 DESCRIPTION
 
 
-=head1 AUTHORS - Karsten Sieber & David Riley
+=head1 AUTHORS - Karsten Sieber
 
-e-mail: ksieber@som.umaryland.edu
+e-mail: Karsten.sieber@gmail.com
 
 =head1 APPENDIX
 
@@ -21,25 +21,15 @@ The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with "_"
 
 =cut
-
 use warnings;
 use strict;
-use lib '/local/projects-t3/HLGT/scripts/lgtseek/lib/';      ### May need to change this depending on where the script is being run
-use LGTSeek;
-use Time::SoFar;
-use run_cmd;
-use setup_input;
-use print_call;
-use Carp;
-$Carp::MaxArgLen = 0;
-use File::Basename;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
 my $results = GetOptions (\%options,
 		'input|i=s', # Comma separated list of files
 		'input_list|I=s',
 		'Qsub|Q=i',
-		'sub_mem=s',
+		'sub_mem|mf=s',
 		'sub_name=s',
 		'excl=i',
 		'no_gal=i',
@@ -76,11 +66,22 @@ my $results = GetOptions (\%options,
 		'diag=i',
 		'fs=i',
 		'verbose|V=i',
+		'print_hostname|ph=i',
 		'config_file=s',
 		'help|h',
 		'help_full|H',
 		'workflow_help'
 		);
+use print_call;
+print_hostname(\%options);									## This is useful for trouble shooting grid nodes that might be missing modules for LGTSeek etc. 
+use lib '/local/projects-t3/HLGT/scripts/lgtseek/lib/';      ### May need to change this depending on where the script is being run
+use LGTSeek;
+use Time::SoFar;
+use run_cmd;
+use setup_input;
+use Carp;
+$Carp::MaxArgLen = 0;
+use File::Basename;
 
 ## Check if the user needs help information
 if($options{help}){&help;}								## @ end of script
@@ -156,7 +157,7 @@ foreach my $input (@$inputs){
 			sort_mem => $lgtseek->{sort_mem},							## Default = 10G lgtseek default. lgt_prep overides to 40G. 
 			threads => $lgtseek->{threads},								## Default = 1
 			split_bam => "0",											## Default = 1
-			keep_softclip => $lgtseek->{keep_softclip},					## Default = 1
+			keep_softclip => $lgtseek->{keep_softclip},					## Default = 1, better to split with lgt_seq_prelim
 			overwrite => $lgtseek->{overwrite},							## Default = 0
 			});															## ^^								^^
 		$input = @$prelim_filtered_bam[0];								## This works because we are not splitting bams
@@ -383,8 +384,8 @@ sub help_full {
 	die "Help: This script takes a bam and identifies bacterial human LGT.
 	     _____
 	____/Input\\_________________________________________________________________________________
-		--input|i=			<Input BAM> Needs to be name sorted. Also use --prelim_filter & --name_sort_input for position sorted inputs.
-		--input_list|I=			<List of BAMS> 1 per line.
+		--input|i=			<Input BAM or fastq> Needs to be name sorted. Also use --prelim_filter & --name_sort_input for position sorted inputs.
+		--input_list|I=			<List of inputs> 1 per line.
 	     ______
 	____/Output\\________________________________________________________________________________
 		--output_dir|o=			Directory for all output. Will be created if it doesn't exist. 
@@ -405,24 +406,17 @@ sub help_full {
 	____/Submit to SGE-grid\\_____________________________________________________________________
 		--Qsub|Q=			<0|1> [0] 1= qsub the job to the grid.
 		  --threads=|t			[1] # of CPU's to use for multithreading BWA sampe
-		  --sub_mem=			[6G] Min mem to qsub for on grid
-		  --sub_name=			[(w+)[1..10]\$] Must start with a letter character
+		  --sub_mem|mf=			[6G] Min mem to qsub for on grid
+		  --sub_name=			[lgtseq] 
 		  --project=			Grid project to use. 
-		  --no_gal=				<0|1> [1] Avoid galactus node. 
-		  --excl=				<0|1> [1] Run exclusively. 
+		  --no_gal=			<0|1> [1] Avoid galactus node. 
+		  --excl=			<0|1> [1] Run exclusively. (Not suggested)
+		  --print_hostname|ph= 		<0|1> [1] Print hostname. Defaults to 1 if verbose=1.
 	     __________
 	____/References\\_____________________________________________________________________________
 		--hg19_ref=			Path to hg19 reference
 		--split_bac_list=		Path to the list of split bacterial references (A2D, E2P, R2Z)
-		--refseq_list=			Path to all bacterial references in refseq. 
-	     __________________
-	____/Calculate Coverage\\_____________________________________________________________________
-		--lgt_coverage=			<0|1> [0] 1= Calculate coverage of hg19 LGT.
-	     ___________________
-	____/Filesystem Defaults\\____________________________________________________________________
-		--fs=				<0|1> [1] 1= Use filesystem defaults for file paths 
-		--clovr=			<0|1> [0] 1= Use clovr defaults for file paths 
-		--diag=				<0|1> [0] 1= Use diag node defaults for file paths  
+		--refseq_list=			Path to all bacterial references in refseq.  
 	     _______________
 	____/Bin Directories\\________________________________________________________________________
 		--bin_dir=			[/local/projects-t3/HLGT/scripts/lgtseek/bin/]

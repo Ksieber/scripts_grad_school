@@ -24,13 +24,7 @@ Internal methods are usually preceded with a _
 =cut
 #use warnings;
 use strict;
-use Scalar::Util qw(reftype);
-use POSIX;
-use run_cmd;
-use LGTSeek;
-use File::Basename;
-use setup_input;
-use setup_output;
+
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 our %options;
 my $results = GetOptions (\%options,
@@ -60,10 +54,20 @@ my $results = GetOptions (\%options,
 	'clovr=s',
 	'diag',
 	'verbose=i',
+	'print_hostname|ph=i',
 	'config_file=s',
 	'help|h',
 	'help_full'
 	);
+use print_call;
+print_hostname(\%options);									## This is useful for trouble shooting grid nodes that might be missing modules for LGTSeek etc. 
+use Scalar::Util qw(reftype);
+use POSIX;
+use run_cmd;
+use LGTSeek;
+use File::Basename;
+use setup_input;
+use setup_output;
 
 if($options{help}){
 	die "Help Basic Info: This script will remove M_M reads and split output bams into smaller bams. 

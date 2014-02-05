@@ -161,24 +161,22 @@ sub Qsub2 {
 	Title		: Qsub3
 	Usage		: Qsub3(\%options);
 	Function	: This Qsub is used ONLY to resubmit the same script call back to the grid.
-	Args		: \%options with:
+	Args		: \%hash with:
 			--input=s
 			--input_list=s
 			--output_dir=s
 			--subdirs=i
 			--Qsub=i
 			--threads=i
-			--mem=s
+			--sub_mem=s
+			--sub_name=s
 			--project=s
 			--wd=s
 			--cwd=i
 			--hostname=s
 			--excl=i
-			--
+			--no_gal=i
 =cut 
-
-## This isn't implemented yet.
-
 sub Qsub3 {
   	my $options=$_[0] || confess "Error Qsub3 didn't get receive a hash ref properly: $!\n";
 
@@ -193,7 +191,7 @@ sub Qsub3 {
  	$opts->{cwd} = defined $options->{cwd} ? " -cwd" : undef;
     $opts->{name} = defined $options->{sub_name} ? " -N $options->{sub_name}" : undef;			## KBS 01.07.14 " -N ksieber";
     $opts->{hostname} = defined $options->{hostname} ? " -l hostname=\"$options->{hostname}\"" : undef;
-    if($options->{no_gal}==1){$opts->{hostname}= " -l hostname=\"magneto|juggernaut|grid*\"";}
+    if($options->{no_gal}==1){$opts->{hostname}= " -l hostname=\"magneto|grid*\"";}
     $opts->{exclusive} = undef;
     if($options->{excl}){$opts->{exclusive} = " -l excl=true";} else {$opts->{exclusive} = undef;}
     my $qsub = "qsub -V";
@@ -207,11 +205,15 @@ sub Qsub3 {
   	if(!$options->{input} && !$options->{input_list}){confess "Error: No input given. Use --input or --input_list.\n";}
   	if(!$options->{output_dir}){confess "Error: No output directory given. Use --output_dir.\n";}
   	my @inputList;
+  	my %out_dirs;
   	if($options->{input_list}){
      	open(LIST,"<","$options->{input_list}") or confess "Can't open --input_list: $options->{input_list} because: $!\n";
    	    while(<LIST>){
    		    chomp;
   		    push(@inputList,$_);
+  		    my($fn,$dir,$suff)=fileparse($_,qr/\.[^\.]+/);
+  		    $fn=~/^([A-Za-z0-9]+).*/;
+  		    $out_dirs{$_}="$options->{output_dir}/$1";
   	    }
   	    close LIST;
     }
@@ -224,19 +226,22 @@ sub Qsub3 {
 	## Build and submit commands
 	foreach my $input (@inputList){
 		my($name,$path,$suf)=fileparse($input,qr/\.[^\.]+/);
-		$options->{output_dir} = $original_output_dir;
+		if($options->{input_list}){
+			$options->{output_dir}=$out_dirs{$input};
+		} else {
+			$options->{output_dir} = $original_output_dir;
+		}
 		if($options->{subdirs}==1){
 			$options->{output_dir} = "$options->{output_dir}\/"."$name\/"; 
 			run_cmd("mkdir -p $options->{output_dir}");
 		}
 		my $qsub_dir = defined $options->{cwd} ? undef : "-wd $options->{output_dir}";
-		if($options->{input_list}){
-			$options->{input} = $input;										## If we are in the orignal call, we need to make sure to qsub a single input
-		}
+		if($options->{input_list}){ $options->{input} = $input; }										## If we are in the orignal call, we need to make sure to qsub a single input
 		my $cmd = "$^X $0";
+		$cmd = $cmd." --print_hostname=1";
 		foreach my $key (keys %$options){
-			next if($options->{input_list} && $key=~/input_list/);
-			next if ($key=~/Qsub/ && !$options->{input_list});
+			next if($key eq 'input_list');
+			next if($key eq 'Qsub');
 			next if($key eq 'subdirs');
 			next if($key eq 'excl');
 			next if($key eq 'no_gal');
