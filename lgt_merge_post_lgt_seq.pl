@@ -1,8 +1,8 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -I /home/ksieber/perl5/lib/perl5/ -I /home/ksieber/scripts/
 use warnings;
 no warnings 'uninitialized';
 use strict;
-use lib qw(/local/projects-t3/HLGT/scripts/lgtseek/lib/ /opt/lgtseek/lib/);      ### May need to change this depending on where the script is being run
+use lib ("/local/projects-t3/HLGT/scripts/lgtseek/lib/","/local/projects/ergatis/package-driley/lib/perl5/x86_64-linux-thread-multi/");      ### May need to change this depending on where the script is being run
 use LGTSeek;
 use run_cmd;
 use setup_input;
@@ -16,7 +16,7 @@ my $results = GetOptions (\%options,
 	'output_dir=s',
 	'output_name=s',
 	'subdirs=s',
-	'config_file=s',
+	'conf_file=s',
 	'help',
 	);
 
@@ -32,6 +32,7 @@ if($options{help}){
 	  --output_name=      Prefix name for the merged output. [Input dir name]
 	----------------------------------------------------------------------------------------
 	--help
+	--conf_file=				[~/.lgtseek.conf]
 	----------------------------------------------------------------------------------------\n";
 }
 

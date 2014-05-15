@@ -16,6 +16,7 @@ driley@som.umaryland.edu
 
 package GiTaxon;
 use strict;
+
 use MongoDB;
 use Bio::DB::Taxonomy;
 use Bio::DB::EUtilities;
@@ -25,12 +26,12 @@ sub new {
     my ($class, $args) = @_;
 
     my $self = {};
-    $self->{'nodes'} = $args->{'nodes'} ? $args->{'nodes'} : '/local/db/by_source/ncbi/taxonomy/latest/names.dmp';
-    $self->{'names'} = $args->{'names'} ? $args->{'names'} : '/local/db/by_source/ncbi/taxonomy/latest/names.dmp';
-    $self->{'gi2tax'} = $args->{'gi2tax'} ? $args->{'gi2tax'} : '/local/db/by_source/ncbi/taxonomy/latest/gi_taxid_nucl.dmp';
+    $self->{'nodes'} = $args->{'nodes'} ? $args->{'nodes'} : '/local/db/repository/ncbi/blast/20120414_001321/taxonomy/taxdump/nodes.dmp';
+    $self->{'names'} = $args->{'names'} ? $args->{'names'} : '/local/db/repository/ncbi/blast/20120414_001321/taxonomy/taxdump/names.dmp';
+    $self->{'gi2tax'} = $args->{'gi2tax'} ? $args->{'gi2tax'} : '/local/db/repository/ncbi/blast/20120414_001321/taxonomy/taxdump/gi_taxid_nucl.dmp';
     $self->{'chunk_size'} = $args->{'chunk_size'} ? $args->{'chunk_size'} : 10000;
     $self->{'idx_dir'} = $args->{'idx_dir'} ? $args->{'idx_dir'} : '/tmp/';
-    $self->{'host'} = $args->{'host'} ? $args->{'host'} : 'tettelin-lx.igs.umaryland.edu';
+    $self->{'host'} = $args->{'host'} ? $args->{'host'} : 'mongotest1-lx.igs.umaryland.edu:10001';
     $self->{'gi_db'} = $args->{'gi_db'} ? $args->{'gi_db'} : 'gi2taxon';
     $self->{'gi_coll'} = $args->{'gi_coll'} ? $args->{'gi_coll'} : 'gi2taxonnuc';
     $self->{'taxonomy_dir'} = $args->{'idx_dir'} ? $args->{'idx_dir'} : '/tmp';

@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -I /home/ksieber/perl5/lib/perl5/ -I /home/ksieber/scripts/
 
 =head1 NAME
 
@@ -21,12 +21,7 @@ The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with a _
 
 =cut
-use lib '/local/projects-t3/HLGT/scripts/lgtseek/lib/';
 use strict;
-use print_call;
-use run_cmd;
-use LGTSeek;
-use File::Basename;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
 my $results = GetOptions (\%options,
@@ -44,9 +39,19 @@ my $results = GetOptions (\%options,
 		'taxon_idx_dir=s',
 		'path_to_blastdb=s',
 		'Qsub=i',
-		'config_file=s',
+		'conf_file=s',
+		'print_hostname|ph=i',
 		'help|h'
-		);
+		) or die "Error: Unrecognized command line option. Please try again.\n";
+
+use print_call;
+$options{print_hostname} = $options{print_hostname} ? $options{print_hostname} : 1;
+print_hostname(\%options);									## This is useful for trouble shooting grid nodes that might be missing modules for LGTSeek etc. 
+
+use lib ("/local/projects-t3/HLGT/scripts/lgtseek/lib/","/local/projects/ergatis/package-driley/lib/perl5/x86_64-linux-thread-multi/");
+use run_cmd;
+use LGTSeek;
+use File::Basename;
 
 if($options{help}){&help();}
 #if(!$options{input}){die "Error: Please give an input with --input=<.fa or .bam>. Try again or use --help.\n";} ## KBS 01.17.14
@@ -130,16 +135,15 @@ die "Help: This script will takes a bam and identifies bacterial human LGT.
 		--input|i=				< BAM, FASTA, or blast_list_file >
 		--output_dir|o=				</dir/for/output/> [cwd]
 		--prinseq_filter=			<0|1> [0] 1=prinseq_filter input bam (not implemented for fasta yet)
+		--Qsub=						<0|1> [0] 1=Submit job to SGE grid. 
 		--taxon_host=
 		--taxon_dir=
 		--taxon_idx_dir=
 		--path_to_blastdb=
-		--clovr=				<0|1> [0] 1=Use clovr defaults for file paths 
-		--diag=					<0|1> [0] 1=Use diag node defaults for file paths 
-		--fs=					<0|1> [1] 1=Use filesystem defaults for file paths 
 		--bin_dir=
 		--samtools_bin=
 		--ergatis_bin=
+		--conf_file=				[~/.lgtseek.conf]
 		--help\n";
 }
 

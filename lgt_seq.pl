@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -I /home/ksieber/perl5/lib/perl5/ -I /home/ksieber/scripts/
 
 =head1 NAME
 
@@ -67,14 +67,16 @@ my $results = GetOptions (\%options,
 		'fs=i',
 		'verbose|V=i',
 		'print_hostname|ph=i',
-		'config_file=s',
+		'conf_file=s',
 		'help|h',
 		'help_full|H',
 		'workflow_help'
-		);
+		) or die "Error: Unrecognized command line option. Please try again.\n";
+
 use print_call;
+$options{print_hostname} = $options{print_hostname} ? $options{print_hostname} : 1;
 print_hostname(\%options);									## This is useful for trouble shooting grid nodes that might be missing modules for LGTSeek etc. 
-use lib '/local/projects-t3/HLGT/scripts/lgtseek/lib/';      ### May need to change this depending on where the script is being run
+use lib ("/local/projects-t3/HLGT/scripts/lgtseek/lib/","/local/projects/ergatis/package-driley/lib/perl5/x86_64-linux-thread-multi/");      ### May need to change this depending on where the script is being run
 use LGTSeek;
 use Time::SoFar;
 use run_cmd;
@@ -430,6 +432,7 @@ sub help_full {
 		--help|h			Help Basic Info
 		--help_full|H			Help Full Info
 		--workflow_help			Examples how to use optional portions of lgt_seq to increase efficiency.
+		--conf_file=				[~/.lgtseek.conf]
 	_____________________________________________________________________________________________\n";
 }
 

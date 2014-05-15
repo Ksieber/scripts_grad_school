@@ -40,7 +40,7 @@ sub run_cmd {
 	chomp(my $res = `$cmd`);
     if($?){
         print $fh "$?\n";
-        confess "FAIL_CMD: $cmd died with message:\n$res\n\n";
+        confess "FAIL_CMD: $cmd died with message: $res\n";
     }
     return $res;
 }
@@ -238,7 +238,6 @@ sub Qsub3 {
 		my $qsub_dir = defined $options->{cwd} ? undef : "-wd $options->{output_dir}";
 		if($options->{input_list}){ $options->{input} = $input; }										## If we are in the orignal call, we need to make sure to qsub a single input
 		my $cmd = "$^X $0";
-		$cmd = $cmd." --print_hostname=1";
 		foreach my $key (keys %$options){
 			next if($key eq 'input_list');
 			next if($key eq 'Qsub');
@@ -266,5 +265,6 @@ sub Qsub3 {
 	}
 	die "+++ Finished submiting all jobs for: $0 +++\n";
 }
+
 
 1;

@@ -7,7 +7,7 @@ use Bio::Index::Blast;
 use Bio::SearchIO::Writer::TextResultWriter;
 
 
-my $file = shift or die "Usage: render4.pl <blast.filei> <ReadID>\n";
+my $file = shift or die "Usage: 3wBlast_Render.pl <blast.filei> <ReadID>\n";
 my $id = shift or die; 
 
 my $indexed_file = "$file.idx";
@@ -18,13 +18,6 @@ my $index = Bio::Index::Blast->new(-filename => $indexed_file,
                                    -verbose => 1);
 unless ($indexed) {
    print STDERR "Creating .idx\n";
-                              #$index->id_parser(\&get_id);
-                              # sub get_id {
-                              # my $line = shift;
-                              #      $line =~ /Query= (\S+)/;
-                              ##      print $1;
-                              #      $1;
-                              #  }
    $index->make_index($file);
 }
 
@@ -73,19 +66,17 @@ my $track = $panel->add_track(
       );
 
 while (my $hit = $result->next_hit) {
- ##next unless $hit->significance < 1E-20;
-   my $feature = Bio::SeqFeature::Generic->new(
-         -display_name  => $hit->name,
-         -score         => $hit->raw_score,
-         -tag           => {
-                  description => $hit->description
-                  },
-         );
-   print STDERR "$hit->name\n";
-   while(my $hsp = $hit->next_hsp ) {
-      $feature->add_sub_SeqFeature($hsp,'EXPAND');
-   }
-   $track->add_feature($feature);
+	##next unless $hit->significance < 1E-20;
+	my $feature = Bio::SeqFeature::Generic->new(
+		-display_name  => $hit->name,
+		-score         => $hit->raw_score,
+		-tag           => { description => $hit->description },
+	);
+	print STDERR "$hit->name\n";
+	while(my $hsp = $hit->next_hsp ) {
+		$feature->add_sub_SeqFeature($hsp,'EXPAND');
+	}
+	$track->add_feature($feature);
 }
 
 my ($url,$map,$mapname)= 

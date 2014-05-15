@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -I /home/ksieber/perl5/lib/perl5/ -I /home/ksieber/scripts/
 
 =head1 NAME
 
@@ -24,7 +24,6 @@ Internal methods are usually preceded with a _
 =cut
 #use warnings;
 use strict;
-
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 our %options;
 my $results = GetOptions (\%options,
@@ -108,13 +107,11 @@ if($options{help_full}){
 		--overwrite=		<0|1> [0] 1= Overwrite previous files.
 		----------------------------------------------------------------------------------------
 		--bin_dir=     		[/local/projects-t3/HLGT/scripts/lgtseek/bin/] Directory where LGTSeek.pm is stored.
-		--fs=			<0|1> [1] 1= IGS filesystem.
-		--clovr=		<0|1> [0] 1= clovr box
-		--diag=			<0|1> [0] 1= Diag node
 		----------------------------------------------------------------------------------------
 		--verbose		<0|1> [1] 1= Verbose reporting of progress. 0 =Turns off reports. 
 		--help 			Basic Help Info
 		--help_full		Full Help Info
+		--conf_file=				[~/.lgtseek.conf]
 		----------------------------------------------------------------------------------------\n";
 }
 

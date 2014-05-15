@@ -31,7 +31,7 @@ use File::Basename;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
 my $results = GetOptions (\%options,
-                          'dbhost=s', # Comma separated list of files
+                          'taxon_host=s', # Comma separated list of files
                           'taxon_dir=s',
                           'port=s',
                           'taxon_idx_dir=s',
@@ -42,7 +42,7 @@ my $lgtseek = LGTSeek->new2({
         options => \%options
         });
 
-print STDERR "Here with dbhost: $lgtseek->{dbhost}\:$lgtseek->{port}.\n";
+print STDERR "Here with taxon_host: $lgtseek->{taxon_host}\:$lgtseek->{port}.\n";
 # Create an lgtseek object
 #my $lgtseek = LGTSeek->new({
 #    taxon_dir => $options{taxon_dir},

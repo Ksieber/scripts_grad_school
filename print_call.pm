@@ -15,27 +15,27 @@ our @EXPORT = qw( print_call print_complete print_hostname );
 sub print_call {
 	my $options = shift;
 	print STDERR "================================================================================================================================\n";
-	print STDERR "=================\t\t $0 \n";
-	print STDERR "================================================================================================================================\n";
 	print STDERR "$0";
-	foreach my $key (keys %$options){ if ($options->{$key}){ print STDERR " --$key=$options->{$key}" };}
+	foreach my $key (sort keys %$options){ if ($options->{$key}){ print STDERR " --$key=$options->{$key}" };}
 	print STDERR "\n================================================================================================================================\n";
 }
 
 sub print_complete {
 	my $options = shift;
 	print STDERR "================================================================================================================================\n";
-	print STDERR "========== COMPLETED\t$0 ==========\n";
-	print STDERR "================================================================================================================================\n";
+	print STDERR "++++++++++ COMPLETED:\t$0 \t\t++++++++++\n";
+	print STDERR "--------------------------------------------------------------------------------------------------------------------------------\n";
 	print STDERR "$0";
-	foreach my $key (keys %$options){ if ($options->{$key}){ print STDERR " --$key=$options->{$key}" };}
+	foreach my $key (sort keys %$options){ if ($options->{$key}){ print STDERR " --$key=$options->{$key}" };}
 	print STDERR "\n================================================================================================================================\n";
 }
 
 
 sub print_hostname {
 	my $options = shift;
-	print STDERR "================================================================================================================================\n";
-	if($options->{print_hostname}){system("echo =================       HOSTNAME: `hostname` 1>&2");}
+	if($options->{print_hostname}){
+		print STDERR "================================================================================================================================\n";
+		system("echo =================       HOSTNAME: `hostname` 1>&2");
+	}
 }
 1;

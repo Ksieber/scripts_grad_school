@@ -12,7 +12,7 @@ our $results = GetOptions (\%options,
 						'output_prefix=s',
                         'output_dir|o=s',
                         'subdirs=s',
-                        'ref=s',
+                        'ref|r=s',
                         'ref_list=s',
                         'threads|t=s',
                         'disable_SW=s',
@@ -23,13 +23,13 @@ our $results = GetOptions (\%options,
                         'insert_metrics=s',
                         'mapped_only=s',
                         'cmd_log=s',
-                        'Qsub=s',
+                        'Qsub|Q=i',
                         'name=s',
                         'project=s',
                         'sub_mem=s',
                         'help|h',
                         'help_full'
-);
+) or die "Error: Unrecognized command line option. Please try again.\n";
 
 ## Help subroutines (at the end of the sciprt)
 if ($options{help}){&help;} 
@@ -192,7 +192,7 @@ sub bwa_align {
     	}
     	run_cmd("rm $output_prefix\_bwa_stderr.log",$log);
   	}
-  	print STDERR "====== Completed BWA mapping: $file1 at: $ref ======\n";
+  	print STDERR "====== Completed BWA mapping: $file1 against: $ref output: $output_prefix ======\n";
 }
 
 

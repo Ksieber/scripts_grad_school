@@ -81,10 +81,30 @@ sub bwa_align {
 	}
 
 	## BWA SAMPE
+	## Comment in our out according to samtools version
+	## samtools 0.2.0 (Broken samtools sort & new view options)
+	# if ($options->{M_only}){
+	# 	run_cmd("bwa sampe $ref $output_prefix\.1.sai $output_prefix\.2.sai $file1 $file2 | samtools view -b -F0x4 - > $output_prefix\.bam",$log);
+	# } elsif ($options->{MM_only}){
+	# 	run_cmd("bwa sampe $ref $output_prefix\.1.sai $output_prefix\.2.sai $file1 $file2 | samtools view -b -F0xC - > $output_prefix\.bam",$log);
+	# } elsif ($options->{sam_output}) {
+	# 	if ($options->{disable_SW}) {
+	# 		run_cmd("bwa sampe -s $ref $output_prefix\.1.sai $output_prefix\.2.sai $file1 $file2 > $output_prefix\.sam 2>>$output_prefix\_bwa_stderr.log",$log);
+	# 	} else {
+	# 		run_cmd("bwa sampe $ref $output_prefix\.1.sai $output_prefix\.2.sai $file1 $file2 > $output_prefix\.sam 2>>$output_prefix\_bwa_stderr.log",$log);
+	# 	}
+	# } else {
+	# 	if ($options->{disable_SW}) {
+	# 		run_cmd("bwa sampe -s $ref $output_prefix\.1.sai $output_prefix\.2.sai $file1 $file2 2>>$output_prefix\_bwa_stderr.log | samtools view -b - > $output_prefix\.bam ",$log);
+	# 	} else {
+	# 		run_cmd("bwa sampe $ref $output_prefix\.1.sai $output_prefix\.2.sai $file1 $file2 2>>$output_prefix\_bwa_stderr.log | samtools view -b - > $output_prefix\.bam ",$log);  ## 2>>$output_prefix\_bwa_stderr.log
+	# 	}
+	# }
+
 	if ($options->{M_only}){
-		run_cmd("bwa sampe $ref $output_prefix\.1.sai $output_prefix\.2.sai $file1 $file2 | samtools view -F0x4 -bhS - > $output_prefix\.bam",$log);
+		run_cmd("bwa sampe $ref $output_prefix\.1.sai $output_prefix\.2.sai $file1 $file2 | samtools view -bhS -F0x4 - > $output_prefix\.bam",$log);
 	} elsif ($options->{MM_only}){
-		run_cmd("bwa sampe $ref $output_prefix\.1.sai $output_prefix\.2.sai $file1 $file2 | samtools view -F0xC -bhS - > $output_prefix\.bam",$log);
+		run_cmd("bwa sampe $ref $output_prefix\.1.sai $output_prefix\.2.sai $file1 $file2 | samtools view -bhS -F0xC - > $output_prefix\.bam",$log);
 	} elsif ($options->{sam_output}) {
 		if ($options->{disable_SW}) {
 			run_cmd("bwa sampe -s $ref $output_prefix\.1.sai $output_prefix\.2.sai $file1 $file2 > $output_prefix\.sam 2>>$output_prefix\_bwa_stderr.log",$log);
@@ -99,11 +119,19 @@ sub bwa_align {
 		}
 	}
 
-  	## Sort and index bams 
-  	if ($options->{sort_index}){
-  		run_cmd("samtools sort $output_prefix\.bam $output_prefix\.srt",$log);
-  		run_cmd("samtools index $output_prefix\.srt.bam $output_prefix\.srt.bai",$log);
-  	}
+
+  	## Sort and index bams
+  	## Comment in our out according to samtools version
+  	## Use this with samtools version >= 0.2.0 (broken)
+  	# if ($options->{sort_index}){
+  	# 	run_cmd("samtools sort -o $output_prefix\.bam - | samtools view -bh - > $output_prefix\.srt.bam",$log);
+  	# 	run_cmd("samtools index $output_prefix\.srt.bam",$log);
+  	# }
+  	## Use this with samtools version <= 0.1.19 
+	if ($options->{sort_index}){
+		run_cmd("samtools sort $output_prefix\.bam $output_prefix\.srt",$log);
+		run_cmd("samtools index $output_prefix\.srt.bam",$log);
+	}
 
     ## Samtools Mpileup
     if ($options->{mpileup}){

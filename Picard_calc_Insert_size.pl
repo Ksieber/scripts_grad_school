@@ -26,6 +26,7 @@ if (!$options{input} && !$options{input_list}){die "ERROR: Must give a input.  U
 
 ## Setup input file(s)
 my $input = setup_input(\%options);
+my $qsub = defined $options{Qsub} ? $options{Qsub} : "0";
 
 ## Run Insert Calculation
 foreach my $file (@$input){
@@ -33,7 +34,7 @@ foreach my $file (@$input){
 	my $out = "$options{output_dir}/$fn";
 	my $cmd1="java -Xmx3g -jar /home/jdhotopp/bin/Picard/picard-tools-1.48/CollectInsertSizeMetrics.jar AS=true I=$file H=$out.std_insert.histogram O=$out.std_insert.metrics M=0 VALIDATION_STRINGENCY=SILENT DEVIATIONS=20";
 	my $cmd2="java -Xmx3g -jar /home/jdhotopp/bin/Picard/picard-tools-1.48/CollectInsertSizeMetrics.jar AS=true I=$file H=$out.lrg_insert.histogram O=$out.lrg_insert.metrics M=0 VALIDATION_STRINGENCY=SILENT DEVIATIONS=1000000000000000000";
-	if($options{Qsub}==1){
+	if($qsub==1){
 		Qsub($cmd1);
 		Qsub($cmd2);
 	} else {
