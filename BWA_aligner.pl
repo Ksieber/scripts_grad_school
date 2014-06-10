@@ -207,12 +207,12 @@ sub help {die "\nHELP: This script will BWA align the input to a reference.
 }
 
 sub help_full {die "\nHELP: This script will align the input (fastq/bam) to a reference.
-	--input=			Input file to be BWA mapped. Either: in.bam or in_1.fq,in_2.fq
+	--input|i=			Input file to be BWA mapped. Either: in.bam or in_1.fq,in_2.fq
 	--input_list=			List of input files to be mapped. 1 bam/line. _1,_2 fastq/line (fastqs MUST be comma seperated).
-	--ref=				Reference.fna+index
+	--ref|r=				Reference.fna+index
 	--ref_list=			List of References.
 	--output_prefix=		Prefix for each output.  Ie. (SRA_LGT)_at_\$ref_name
-	--output_dir=			Will output to current working directory unless another is specified with this. ie. /ksieber_dir/tmp/
+	--output_dir|o=			Will output to current working directory unless another is specified with this. ie. /ksieber_dir/tmp/
 	--subdirs=			<0|1> [0] 1= Make subdirectories for each input file to be mapped. 
 	--disable_SW=			<0|1> [0] 1= Disable Smith-Waterman for the UM mate. Ideal for quicker LGT mappings IF they are high confidence. 
 	--mapped_only=			<0|1> [0] 1= Only keep mates with 1 mapped read.
@@ -221,8 +221,8 @@ sub help_full {die "\nHELP: This script will align the input (fastq/bam) to a re
 	--mpileup=			<0|1> [0] 1= Calculate pileup coverage on .bam.
 	--no_cleanup=			<0|1> [0] 0= Removes .sai files and unsorted.bam with --sort_index. 1=No deleting intermediate data. 
 	--insert_metrics=		<0|1> [0] 1= Use Picard to calculate insert size metrics.
-	--Qsub=				<0|1> [0] 1= qsub the mapping to SGE grid.
-	  --threads=			< # >   [1] Set the number of cpu threads to use for bwa aln steps. USE CAREFULLY.
+	--Qsub|Q=				<0|1> [0] 1= qsub the mapping to SGE grid.
+	  --threads|t=			< # >   [1] Set the number of cpu threads to use for bwa aln steps. USE CAREFULLY.
 	  --project=			[jdhotopp-lab].
 	  --sub_mem=			[6G] Memory free for qsub.
 	  --name=			Name qsub submission.

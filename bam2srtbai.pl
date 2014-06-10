@@ -62,10 +62,10 @@ if($Qsub==1){
 
 
 print STDERR "+++ Sorting bam +++\n";
-my $cmd1 = "samtools sort -m $sort_mem -@ $threads $input $out\.pos-sort";
+my $cmd1 = "samtools sort -m $sort_mem -@ $threads $input $out\.psort";
 run_cmd($cmd1);
 print STDERR "+++ Indexing bam +++\n";
-my $cmd2= "samtools index $out\.pos-sort.bam $out\.pos-sort.bai";
+my $cmd2= "samtools index $out\.psort.bam $out\.psort.bai";
 run_cmd($cmd2);
 
 

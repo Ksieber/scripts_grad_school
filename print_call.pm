@@ -3,7 +3,7 @@ use warnings;
 use strict;
 use Exporter;
 our @ISA = qw(Exporter);
-our @EXPORT = qw( print_call print_complete print_hostname );
+our @EXPORT = qw( print_call print_complete print_hostname print_notebook );
 
 =head2 print_call
 	Title		: print_call
@@ -38,4 +38,18 @@ sub print_hostname {
 		system("echo =================       HOSTNAME: `hostname` 1>&2");
 	}
 }
+
+sub print_notebook {
+	my $options = shift;
+	if($options->{output_dir}){
+		open(OUT,">","$options->{output_dir}/\_notebook.txt") || die "Error: Unable to open output: $options->{output_dir}\_notebook.txt because: $!\n";	
+	} else {
+		open(OUT,">","_notebook.txt") || die "Error: Unable to open output: _notebook.txt because: $!\n";
+	}
+	print OUT "$0";
+	foreach my $key (sort keys %$options){ if ($options->{$key}){ print OUT " --$key=$options->{$key}" };}
+	print OUT "\n";
+	close OUT;
+}
+
 1;

@@ -30,23 +30,29 @@ my $results = GetOptions (\%options,
 	'sort2=i',
 	'reads_list=s',
 	'n_num|n=i',
+	'draw_nstring=i',
 	'fix_orientation=i',
 	'M_only=i',
 	'MM_only=i',
 	'png=i',
 	'svg=i',
+	'draw_stdev|d=i',
+	'draw_both|B=i',
+	'picard_file|P=s',
+	'stdev|D=i',
+	'insert_size|I=i',
 	'image_length=i',
 	'image_width=i',
 	'pad_scale=i',
 	'output_dir|o=s',
-	'output_prefix=s',
+	'output_prefix|p=s',
 	'merged_ref_name=s',
 	'help|h'
 ) or confess "Invalid arguement. Please try agian.\n";
 
 if($options{help}){&help;}   ## &help is @ the end of the script
 if(!$options{ref1} || !$options{ref2} || !$options{bam1}) {
-	confess "Error: You MUST pass ALL of the folowing arguements: --bam1 --ref1 --ref2 . Please try agian.\n";
+	confess "Error: You MUST pass ATLEAST the folowing arguements: --bam1 --ref1 --ref2 . Please try agian.\n";
 }
 
 print_call(\%options);
@@ -60,6 +66,9 @@ my ($fn1,$path1,$suff1) = fileparse($options{bam1},qr/\.[^\.]+/);
 my $out_dir = $options{output_dir} ? $options{output_dir} : $path1;
 run_cmd("mkdir -p $out_dir");
 my $output_prefix = $options{output_prefix} ? $options{output_prefix} : $fn1;
+if($output_prefix=~/(.+)\_psort$/){
+	$output_prefix = $1;		## Remove a trailing _psort form input prefix 
+}
 my $out = $out_dir . $output_prefix;
 my $working_dir = "$out_dir"."/merge_2lgt_bams/";
 run_cmd("mkdir -p $working_dir"); 		# Create a safe directory to work in
@@ -88,19 +97,6 @@ if($sort2==1){
 	run_cmd("samtools index $working_dir\/$fn2\_psort.bam",$log);
 	$options{bam2} = "$working_dir\/$fn2\_psort.bam";
 }
-
-## Use this with samtools version <= 0.1.19
-# if($sort1==1){
-# 	run_cmd("samtools sort $options{bam1} $working_dir/$fn1\_psort",$log);
-# 	run_cmd("samtools index $working_dir/$fn1\_psort.bam",$log);
-# 	$options{bam1} = "$working_dir/$fn1\_psort.bam";
-# }
-# if($sort2==1){
-# 	my ($fn2,$path2,$suff2) = fileparse($options{bam2},qr/\.[^\.]+/); 
-# 	run_cmd("samtools sort $options{bam2} $working_dir\/$fn2\_psort",$log);
-# 	run_cmd("samtools index $working_dir\/$fn2\_psort.bam",$log);
-# 	$options{bam2} = "$working_dir\/$fn2\_psort.bam";
-# }
 
 my %reads;  ## Hash of desired read id's.
 if($options{reads_list}){
@@ -151,6 +147,7 @@ my $merged_ref = &merge_refs({
 	bam2_data 	=> 	$bam2_data,
 	ref1_region =>	$ref1_region,
 	ref2_region	=>	$ref2_region,
+	output_dir	=> $out_dir,
 	});
 
 ## Merge the sam reads into a bam only for mapping @ the new reference.
@@ -180,17 +177,55 @@ if($options{M_only}){
 }
 run_cmd("cat $out_dir/log.txt >> $log",$log);
 run_cmd("rm $out_dir/log.txt",$log);
+# Make a position sorted final output bam in the /working/dir/ to be used to draw the img
+run_cmd("samtools sort $out_dir\/Merged\-final\_$output_prefix\.bam $working_dir\/Merged\-final\_$output_prefix\-psrt",$log);
+my $psrt_bam = "$working_dir\/Merged\-final\_$output_prefix\-psrt.bam";
 
-if($options{png} || $options{svg}){ 
+## Iterate to draw both STDEV & Normal img's if --draw_both
+if($options{draw_both}){
+	## First draw the "normal" img
 	&draw_img({ 
-		bam => "$out_dir\/Merged\-final\_$output_prefix\.bam", 
+		bam => $psrt_bam, 
 		ref_data => $merged_ref, 
+		output_dir => $out_dir,
+		output_prefix => "Merged\-$output_prefix",
 		png => $options{png}, 
-		svg => $options{svg} 
+		svg => $options{svg},
+		draw_stdev => "0",
+		draw_nstring => $options{draw_nstring},
+		});
+	## Second draw the color coded img
+	&draw_img({ 
+		bam => $psrt_bam, 
+		ref_data => $merged_ref,
+		output_dir => $out_dir,
+		output_prefix => "Merged\-$output_prefix\_stdev", 
+		png => $options{png}, 
+		svg => $options{svg},
+		draw_stdev => "1",
+		stdev => $options{stdev},
+		insert_size => $options{insert_size},
+		picard_file => $options{picard_file},
+		draw_nstring => $options{draw_nstring},
+		});
+} elsif($options{png} || $options{svg}){ 
+	&draw_img({ 
+		bam => $psrt_bam, 
+		ref_data => $merged_ref,
+		output_dir => $out_dir,
+		output_prefix => "Merged\-final\-$output_prefix", 
+		png => $options{png}, 
+		svg => $options{svg},
+		draw_stdev => $options{draw_stdev},
+		stdev => $options{stdev},
+		insert_size => $options{insert_size},
+		picard_file => $options{picard_file},
+		draw_nstring => $options{draw_nstring},
 		});
 }
 
 print_complete(\%options);
+print_notebook(\%options);
 ## Done processing
 
 ###################################
@@ -219,7 +254,7 @@ sub pull_bam_data {
 	delete $header[-1];
 
 	my $open_cmd = defined $opts->{region} ? "samtools view -F0x4 $opts->{bam} \"$opts->{region}\" 2>>$log |" : "samtools view -F0x4 $opts->{bam} 2>>$log |";
-	
+
 	my $bam_orientation = 0;
 	my %bam_data;
 	open(BAM,"$open_cmd") or confess "Error: Unable to open input bam: $opts->{bam} because: $!\n";
@@ -300,7 +335,12 @@ sub pull_ref_data {
 	# Finally, pull the region from the fasta reference
 	my $ref_db = Bio::DB::Fasta->new($opts->{ref});
 	my $seq = $ref_db->seq($actual_chr,$actual_lower_range => $actual_upper_range);
-	return $seq;
+	
+	my $retval = {
+		'seq' => $seq,
+		'range' => "$actual_chr\:$actual_lower_range\-$actual_upper_range",
+	};
+	return $retval;
 }
 
 =head1
@@ -348,14 +388,15 @@ sub merge_hash_ids {
 
 =head1
 
-Title   : merge_hash_ids
-Usage   : my $merged_ids = create_n_string([%hash1,%hash2,%hash3]);
-Function: Merge keys from multiple hashes to find keys that exist in all hashes
+Title   : merge_refs
+Usage   : my 
+Function: 
 Args    : 
 		bam1_data 	=> 	$bam1_data
 		bam2_data 	=> 	$bam2_data
 		ref1_region =>	$ref1_region
 		ref2_region	=>	$ref2_region
+		output_dir	=>  $output_dir (for ref_ranges.txt)
 
 Returns : 1 hash with uniq id's
 
@@ -367,47 +408,58 @@ sub merge_refs {
 	my $n_num = defined $options{n_num} ? $options{n_num} : 100; 
 	my $n_string = &create_n_string($n_num);
 	
-	# Determine how the two references should be facing
-	my $new_ref = $opts->{ref1_region} . $n_string . $opts->{ref2_region};
-	## Cords = Ref1 : nstring : ref2
-	my $cords = {
-					ref1_lower 	=> 1,
-					ref1_upper 	=> length($opts->{ref1_region})+1,
-					n_lower 	=> length($opts->{ref1_region})+2,
-					n_upper 	=> length($opts->{ref1_region})+2+length($n_string),
-					ref2_lower 	=> length($opts->{ref1_region})+2+length($n_string)+1,
-					ref2_upper 	=> length($opts->{ref1_region})+2+length($n_string)+1+length($opts->{ref2_region}),
-				};
+	my $ref1_region;
+	my $ref2_region;
 
-	if($fix_orientation==1){
+	## Fix orientation based on majority of the sequencing reads if the options is passed
+	if($fix_orientation==1){ 
 		map {
-				my $bam_data = $_;
-				foreach my $id (keys %{$merged_ids}){
-					my $bam_line = $bam_data->{id_hash}->{$id};
-					my $raw_flag = (split/\t/,$bam_line)[1];
-					my $parsed_flag = $lgtseek->_parseFlag($raw_flag);
-					if($parsed_flag->{'qrev'}){
-						$bam_data->{strand}--;
-					} else {
-						$bam_data->{strand}++;
-					}
+			my $bam_data = $_;
+			foreach my $id (keys %{$merged_ids}){
+				my $bam_line = $bam_data->{id_hash}->{$id};
+				my $raw_flag = (split/\t/,$bam_line)[1];
+				my $parsed_flag = $lgtseek->_parseFlag($raw_flag);
+				if($parsed_flag->{'qrev'}){
+					$bam_data->{strand}--;
+				} else {
+					$bam_data->{strand}++;
 				}
+			}
 		} ($opts->{bam1_data},$opts->{bam2_data});
 		if($opts->{bam1_data}->{strand}<=0 && $opts->{bam2_data}->{strand}>=0){
-			$new_ref = $opts->{ref2_region} . $n_string . $opts->{ref1_region};
-			$cords = {
-					ref1_lower 	=> 1,
-					ref1_upper 	=> length($opts->{ref2_region})+1,
-					n_lower 	=> length($opts->{ref2_region})+2,
-					n_upper 	=> length($opts->{ref2_region})+2+length($n_string),
-					ref2_lower 	=> length($opts->{ref2_region})+2+length($n_string)+1,
-					ref2_upper 	=> length($opts->{ref2_region})+2+length($n_string)+1+length($opts->{ref1_region}),
-					};
+			$ref1_region = $opts->{ref2_region};
+			$ref2_region = $opts->{ref1_region};
 		}
-	} 
+	} else {
+		$ref1_region = $opts->{ref1_region};
+		$ref2_region = $opts->{ref2_region};
+	}
 
+
+	## Build the new reference Sequence
+	my $new_ref = $ref1_region->{seq} . $n_string . $ref2_region->{seq};
+	
+	## Calculate the cordinates for the new reference
+	my $cords = {
+		ref1_lower 	=> 1,
+		ref1_upper 	=> length($ref1_region->{seq}),
+		n_lower 	=> length($ref1_region->{seq})+1,
+		n_upper 	=> length($ref1_region->{seq})+length($n_string),
+		ref2_lower 	=> length($ref1_region->{seq})+length($n_string)+1,
+		ref2_upper 	=> length($ref1_region->{seq})+length($n_string)+length($ref2_region->{seq}),
+	};
+
+	## Open text file to print the cordinates of the references and the cordinates of the new image. 
+	open (TXT,">","$opts->{output_dir}/Ref_img_cords.txt") or confess "Error: can't open the output file for the ref & img cordinates: $opts->{output_dir}/Ref_img_cords.txt because: $!";
+	print TXT "Reference\tImage_cords\n";
+	print TXT "$ref1_region->{range}\t$cords->{ref1_lower}\-$cords->{ref1_upper}\n";
+	print TXT "n_string\:1-".length($n_string)."\t$cords->{n_lower}\-$cords->{n_upper}\n";
+	print TXT "$ref2_region->{range}\t$cords->{ref2_lower}\-$cords->{ref2_upper}\n";
+	close TXT; 
+
+	## Print new reference Sequence.
 	my $new_ref_name = defined $options{merged_ref_name} ? $options{merged_ref_name} : "Merged";
-	open(FASTA,">","$working_dir\/Merged-refs\_$output_prefix.fa") or confess "Error: can't open the output file for the new merged fasta: $working_dir\/Merged-tmp\_$output_prefix.fa because: $!";
+	open (FASTA,">","$working_dir\/Merged-refs\_$output_prefix.fa") or confess "Error: can't open the output file for the new merged fasta: $working_dir\/Merged-tmp\_$output_prefix.fa because: $!";
 	print FASTA "\>$new_ref_name\n";	## Print new "chr" header line for .fasta
 	print FASTA $new_ref . "\n";
 	close FASTA;
@@ -427,19 +479,17 @@ sub draw_img {
 	my $merged_ref = $opts->{ref_data};
 	my $png = defined $opts->{png} ? $opts->{png} : "0";
 	my $svg = defined $opts->{svg} ? $opts->{svg} : "0";
-
+	my $draw_stdev = defined $opts->{draw_stdev} ? $opts->{draw_stdev} : "0";
+	
 	if($lgtseek->empty_chk({input => $bam})==1){confess "Error: The Merged-final.bam: $bam is empty.\n";}
-
-	my ($fn,$path,$suff)=fileparse($bam,'.bam');
-	run_cmd("samtools sort $bam $working_dir/$fn\-psrt",$log);
-	my $psrt_bam = "$working_dir/$fn\-psrt.bam";
-	my $sam = Bio::DB::Sam->new(
-		-bam => $psrt_bam,
-		-fasta => $merged_ref->{file},
-		-expand_flags => 1,
-		-autoindex => 1
-		);
 	#############################################################
+	## Setup OUTPUT
+	my ($fn,$path,$suff)=fileparse($bam,'.bam');
+	my $out_dir = defined $opts->{output_dir} ? $opts->{output_dir} : $path;
+	my $out_pref = defined $opts->{output_prefix} ? $opts->{output_prefix} : $fn;
+	my $out = "$out_dir\/$out_pref";
+	#############################################################
+	## Setupt image boundries
 	my $image_width = defined $options{image_width} ? $options{image_width} : "1600";
 	my $image_length = defined $options{image_length} ? $options{image_length} : "800";
 	my $pad_scale = defined $options{pad_scale} ? $options{pad_scale} : "0";
@@ -447,30 +497,46 @@ sub draw_img {
 	## Calculate scale size ##
 	my $scale_size = defined $options{scale} ? $options{scale} : length($merged_ref->{seq});
 	#############################################################
+	# Calculate & setup drawing StDev.
+	my $insert_size;
+	my $deviation; 
+	if($draw_stdev==1){
+		if(defined $opts->{insert_size} && defined $opts->{stdev}){
+			$insert_size = $opts->{insert_size};
+			$deviation = $opts->{stdev};
+		} elsif (defined $opts->{picard_file}){
+			my @lines = `head -n 8 $opts->{picard_file}`;
+			if($lines[6]!~/^MEDIAN_INSERT_SIZE/){ confess "Error: The Picard file doesn't look right. Please fix it and try agian.\n";}
+			($insert_size,$deviation) = (split/\t/,$lines[7])[0,1];
+		} else {
+			confess "Error: Must use either (--insert_size=[#] & --stdev=[#]) or --picard_file=<file path with Picard insert metrics>\n";
+		}
+	}
+	#############################################################
 	# Initialize Bio:Graphics img
 	my @panel_options = (
 		-length    => $image_length,
 		-width     => $image_width,
 		-pad_left  => 10,
 		-pad_right => 10,
+		-spacing   => 1,
 		);
 	if($svg==1){push(@panel_options,(-image_class=>'GD::SVG'))};
 	my $panel = Bio::Graphics::Panel->new(@panel_options);
-
+	#############################################################
 	## Scale at the top of the img
 	my $scale = Bio::SeqFeature::Generic->new(
 		-start => 1,								## Need to make this the start position
 		-end   => $scale_size,						## Need to make this the end position
 		);
-
 	$panel->add_track($scale,
 		-glyph   => 'arrow',
 		-tick    => 2,
 		-fgcolor => 'black',
 		-double  => 1,
 		);
-
-	## Track for references
+	#############################################################
+	## Tracks for references
 	## Left Reference
 	my $ref1_feature = Bio::SeqFeature::Generic->new(
 		-start 		=> $merged_ref->{cords}->{ref1_lower},
@@ -481,14 +547,16 @@ sub draw_img {
 		-bgcolor 	=> 'red',
 		);
 	# ## N-string "contig"
-	# my $nstring_feature = Bio::SeqFeature::Generic->new(
-	# 	-start 		=> $merged_ref->{cords}->{n_lower},
-	# 	-end 		=> $merged_ref->{cords}->{n_upper},
-	# 	);
-	# $panel->add_track($nstring_feature,
-	# 	-glyph 		=> 'crossbox',
-	# 	-fgcolor 	=> 'black',
-	# 	);
+	if($opts->{draw_nstring}){
+		my $nstring_feature = Bio::SeqFeature::Generic->new(
+			-start 		=> $merged_ref->{cords}->{n_lower},
+			-end 		=> $merged_ref->{cords}->{n_upper},
+			);
+		$panel->add_track($nstring_feature,
+			-glyph 		=> 'crossbox',
+			-fgcolor 	=> 'black',
+			);
+	}
 	## Right Reference
 	my $ref2_feature = Bio::SeqFeature::Generic->new(
 		-start 		=> $merged_ref->{cords}->{ref2_lower},
@@ -498,26 +566,61 @@ sub draw_img {
 		-glyph 		=> 'generic',
 		-bgcolor 	=> 'blue',
 		);
-		
+	#############################################################
 	## Track for bam data 
-	my $bam_track = $panel->add_track(
-		-glyph     => 'transcript2',
-		-label     => 0,
-		-bgcolor   => 'purple',
+	## Initialize the bam db
+	my $sam = Bio::DB::Sam->new(
+		-bam => $bam,
+		-fasta => $merged_ref->{file},
+		-expand_flags => "1",
+		-autoindex => "1",
 		);
-
 	## Add feature by reads_list and region later
-	my @pairs = $sam->features(-type => 'read_pair');
+	my @pairs = sort($sam->features(-type => 'read_pair'));
 	for my $pair (@pairs){
 		my ($first_mate,$second_mate) = $pair->get_SeqFeatures;
-		$bam_track->add_feature([$first_mate,$second_mate]);
+		my $track;
+		if($draw_stdev==1){
+			my $read_insert_size = $pair->length;
+			my $variance = $insert_size - ($read_insert_size - $first_mate->length - $second_mate->length);
+			my $color;
+			if (abs($variance) < (.5 * $deviation)){
+				$color = 'green';
+			} elsif (abs($variance) <= $deviation){
+				$color = 'red' if $variance < 0;
+				$color = 'blue' if $variance > 0;
+			} elsif (abs($variance) <= (2 * $deviation)){
+				$color = 'orangered' if $variance <= 0;
+				$color = 'cyan' if $variance > 0;
+			} elsif (abs($variance) > (2 * $deviation)){
+				$color = 'gold' if $variance <= 0;
+				$color = 'powderblue' if $variance > 0;
+			}
+			$track = $panel->add_track(
+							-glyph     => 'transcript2',
+							-label     => 0,
+							-connector => 'dashed',
+							-bgcolor   => $color,
+							);
+		} else {
+			$track = $panel->add_track(
+							-glyph     => 'transcript2',
+							-label     => 0,
+							-connector => 'dashed',
+							-bgcolor   => 'purple',
+							);
+		}
+		$track->add_feature([$first_mate,$second_mate]);
 	}
 
 	#############################################################
+	## Print out the image
 	my $OFH;
 	my $output_suffix = $png==1 ? ".png" : ".svg";
-	if($options{output_dir} || $options{output_prefix}){
-		open($OFH,">","$path\/$fn$output_suffix") or die "Can't output the output: $out-Merged.png because: $!\n";
+	if($opts->{output_dir} || $opts->{output_prefix}){
+		open($OFH,">","$out$output_suffix") or die "Can't output the output: $out-Merged.png because: $!\n";
+	} elsif($opts->{stdout}){
+		$OFH = *STDOUT;
 	} else {
 		open ($OFH, " | display - ") or die "Can't output to display.\n";
 	}
@@ -527,31 +630,51 @@ sub draw_img {
 }
 
 sub help {
-	die "Help: This script will take a 2 bams mapped @ different references and merge the reference & map at the merged reference. This is useful for merging LGT regions.
-		--bam1=				bam1. Assumes position sorted & indexed.
-		  --bam1_region=		<chr#:100-200>
+	die "Help: This script will take a 2 bams mapped @ different references and merge the references & map at the merged reference. The final new bam can be drawn as a png or svg. This is useful for merging and illustrating LGT regions.
+		------------------------------------------------------------------------------------------------------------------------------------------------------------
+		--bam1=				bam1. Assumes position sorted & indexed. If not, use --sort=1. (Mandatory)
+		  --bam1_region=		<chr#:100-200> Pull reads only from this region. (Highly recommended)
 		  --sort1=			<0|1> [0] 1= Position sort & index bam1.
-		--bam2=				bam2. Assumes position sorted & indexed.
-		  --bam2_region=		<chr#:100-200>
+		--bam2=				bam2. Assumes position sorted & indexed. If not, use --sort=1. (Optional)
+		  --bam2_region=		<chr#:100-200> Pull reads only from this region. (Highly recommended)
 		  --sort2=			<0|1> [0] 1= Position sort & index bam2.
-		--ref1=				Reference 1 fasta.
-		  --ref1_region=		<chr#:100-200>
-		--ref2=				Reference 2 fasta.
-		  --ref2_region=		<chr#:100-200>
-		--reads_list=			Path to a file with a list of desired reads to parse for. 1 read / line. 
+		------------------------------------------------------------------------------------------------------------------------------------------------------------
+		--ref1=				Reference 1 fasta. 		(Assumes bam1 is already mapped aginst ref1)(Mandatory)
+		  --ref1_region=		<chr#:100-200> Use this reference range to map & draw reads against. If no ref_region, the bam reads' region will be used. 
+		--ref2=				Reference 2 fasta.		(If no --bam2, and --ref2 is used, --bam1 will be mapped against --ref2)
+		  --ref2_region=		<chr#:100-200> Use this reference range to map & draw reads against. If no ref_region, the bam reads' region will be used. 
+		------------------------------------------------------------------------------------------------------------------------------------------------------------
+		--reads_list=			Path to a file with a list of desired reads to parse for. 1 read ID / line. 
 		--M_only=			<0|1> [0] 1= When remapping to the merged reference, only keep M_* read pairs
-		--MM_only=    			<0|1> [1] 1= When remapping to the merged reference, only keep M_M read pairs
+		--MM_only=    			<0|1> [1] 1= When remapping to the merged reference, only keep M_M read pairs (Highly recommended)
 		--merged_ref_name= 		Name for the new reference.  		[Merged]
 		--n_num|n= 			Number of \"N's\" to insert inbetween merged references. [100]
-		--png=				<0|1> [0] 1=Create a png img of the merged bam. 
+		--draw_nstring=	<0|1> [0] 1= Draw the n-string \"contig\".
+		------------------------------------------------------------------------------------------------------------------------------------------------------------
+		--png=				<0|1> [0] 1=Create a png img of the merged bam.
+		--svg=				<0|1> [0] 1=Create a svg img of the merged bam.
 		  --image_length=		Ajust the length of the png created.
 		  --image_width=		Adjust the width of the png created. 
 		  --pad_scale=			Pad white space around img. 
 		  --fix_orientation=		<0|1> [1] 1= Try to determine how the references should be organized L-vs-R to make Mates face eachother.
 							  0= Bam1 is on Left, Bam2 is on Right.
-		--output_dir=			Directory for output. 				[bam1 dir]
-		--output_prefix=		Prefix for the output fasta & bam. 	[bam1-merged-bam2]
-		--help|h\n";
+		------------------------------------------------------------------------------------------------------------------------------------------------------------
+		--draw_stdev|d=			<0|1> [0] 1=Color code the reads based on variance from STDEV of insert size;
+						+/- STDEV * .5=Green ; 1=Dark Blue/Red ; 2=Light Blue/Orange
+		--draw_both|B=			<0|1> [0] 1= Draw both a \"normal\" & stdev color coded img.
+		  --picard_file|P=		< /path/to/file.txt > Picard insert metrics file. Must be used if --stdev && --insert_size are not used.
+		  --insert_size|I=		< # > 
+		  --stdev|D=			< # >
+		------------------------------------------------------------------------------------------------------------------------------------------------------------							  
+		--output_dir|o=			Directory for output. 				[/options/bam1/dir/]
+		--output_prefix|p=		Prefix for the output fasta & bam. 	[bam1-merged-bam2]
+		--stdout=				<0|1> [0] 1= Output goes to STDOUT. Either pipe it into a \"display\" ( | display - ) or redirect it to a new file ( > new.img)
+		--help|h
+		------------------------------------------------------------------------------------------------------------------------------------------------------------
+		Example: perl merge_2lgt_bams.pl --bam1=bam_with_lgt_reads.bam --sort1=1 --ref1=hg19.fa --ref2=bacteria_with_lgt.fa --ref1_region=chr1:100-500 --bam1_region=chr1:200-400 --MM_only=1 --svg=1
+				This will pull reads from the {bam_with_lgt_reads.bam} @ {chr1:200-400} ; map them against {bacteria_with_lgt.fa} ; create a new reference from {chr1:100-500} & 
+				the region where the reads mapped in the {bacteria_with_lgt.fa}. The reads that are {mapped-mapped} to the new reference are then kept in the final bam and drawn as an {svg}. 
+		------------------------------------------------------------------------------------------------------------------------------------------------------------\n";
 }
 
 ###################################
