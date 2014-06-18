@@ -1,16 +1,20 @@
 #!/usr/bin/perl -I /home/ksieber/perl5/lib/perl5/ -I /home/ksieber/scripts/
 use warnings;
 use strict;
-use Carp;
-use lib "/local/projects-t3/HLGT/scripts/lgtseek/lib/";      ### May need to change this depending on where the script is being run
 use Data::Dumper;
-use LGTSeek;
+use Carp;
+use Bio::DB::Fasta;
+use Bio::DB::Sam;
 use Bio::Graphics;
 use Bio::SeqIO;
 use Bio::SeqFeature::Generic;
-use Bio::DB::Sam;
+use GD;
+use GD::SVG;
 use File::Basename;
 use run_cmd;
+use print_call;
+use bwa;
+use LGTSeek;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
 my $results = GetOptions (\%options,
@@ -43,7 +47,7 @@ if($lgtseek->empty_chk({input => $input})==1){die "Error: The input: $options{in
 ## Setup Output
 my $output_dir = defined $options{output_dir} ? "$options{output_dir}" : "$path";
 my $output_prefix =  defined $options{output_prefix} ? "$options{output_prefix}" : "$fn";
-my $out = "$output_dir/$output_prefix\.png";
+my $out = "$output_dir/$output_prefix\.svg";
 #############################################################
 ## Setup Defaults
 my $sort = defined $options{sort} ? $options{sort} : "0";
@@ -54,9 +58,9 @@ my $pad_scale = defined $options{pad_scale} ? $options{pad_scale} : "0";
 #############################################################
 ## Sort bam
 if($sort==1){
-	run_cmd("samtools sort $input $output_dir$fn\_bam2png_tmp_srt");
-	run_cmd("samtools index $output_dir$fn\_bam2png_tmp_srt.bam $output_dir$fn\_bam2png_tmp_srt.bai");
-	$input = "$output_dir$fn\_bam2png_tmp_srt.bam";	
+	run_cmd("samtools sort $input $output_dir$fn\_bam2svg_tmp_srt");
+	run_cmd("samtools index $output_dir$fn\_bam2svg_tmp_srt.bam $output_dir$fn\_bam2svg_tmp_srt.bai");
+	$input = "$output_dir$fn\_bam2svg_tmp_srt.bam";	
 }
 #############################################################
 ## Calculate scale size 
@@ -87,6 +91,7 @@ my $panel = Bio::Graphics::Panel->new(
 					-pad_left  => 10,
 					-pad_right => 10,
 					-spacing   => 1,
+					-image_class=>'GD::SVG'
 					);
 ## Scale at the top of the img
 my $scale = Bio::SeqFeature::Generic->new(
@@ -129,6 +134,7 @@ for my $pair (@pairs){
 	if($draw_stdev==1){
 		my $read_insert_size = $pair->length;
 		my $variance = $insert_size - $read_insert_size;
+		# print STDERR "insert_size: $insert_size\tRead_i-size:".$pair->length."Variance= $variance\n";
 		my $color;
 		if (abs($variance)==0){
 			$color = 'white';
@@ -145,6 +151,7 @@ for my $pair (@pairs){
 			$color = '170,0,0' if $variance <= 0;
 			$color = '0,170,0' if $variance > 0;
 		}
+		# print STDERR "Color: $color\n";
 		$track = $panel->add_track(
 						-glyph     => 'transcript2',
 						-label     => 0,
@@ -169,26 +176,25 @@ if($options{output_dir} || $options{output_prefix}){
 } elsif($options{stdout}){
 	$OFH = *STDOUT;
 } else {
-	print STDERR "*** Completed creating the bam.png, opening display to show results now . . .\n";
+	print STDERR "*** Completed creating the bam.svg, opening display to show results now . . .\n";
 	open ($OFH, " | display - ") or die "Can't output to display.\n";
 }
-print $OFH $panel->png;
+print $OFH $panel->svg;
 close $OFH;
 
 if($options{sort}){
-	run_cmd("rm $output_dir$fn\_bam2png_tmp_srt.bam"); 
-	run_cmd("rm $output_dir$fn\_bam2png_tmp_srt.bai");
+	run_cmd("rm $output_dir$fn\_bam2svg_tmp_srt.bam"); 
+	run_cmd("rm $output_dir$fn\_bam2svg_tmp_srt.bai");
 }
-
 
 
 
 sub help {
 	die	
 "	----------------------------------------------------------------------------------------
-	Help: This script will take a bam and use Bio::Graphics to create a .png of the reads.
+	Help: This script will take a bam and use Bio::Graphics to create a .svg of the reads.
 		The bam either needs to cover a small region or --region NEEDS be used. 
-		ex: bam2png.pl foo.bam | display - 
+		ex: bam2svg.pl foo.bam | display - 
 		----------------------------------------------------------------------------------------
 		## ARGV[0]			Position sorted bam. Should be very small b/c memory intense. 
 		--input=			Position Sorted bam. Should be very small b/c memory intense. 

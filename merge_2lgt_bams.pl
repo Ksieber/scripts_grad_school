@@ -74,6 +74,7 @@ my $working_dir = "$out_dir"."/merge_2lgt_bams/";
 run_cmd("mkdir -p $working_dir"); 		# Create a safe directory to work in
 my $log = "$working_dir\/log.txt";
 run_cmd("touch $log");
+print_notebook(\%options);
 
 ## Map bam1 against ref2 if bam2 wasn't given.
 if(!$options{bam2} && $options{ref2}){
@@ -225,7 +226,6 @@ if($options{draw_both}){
 }
 
 print_complete(\%options);
-print_notebook(\%options);
 ## Done processing
 
 ###################################
@@ -499,15 +499,15 @@ sub draw_img {
 	#############################################################
 	# Calculate & setup drawing StDev.
 	my $insert_size;
-	my $deviation; 
+	my $stdev; 
 	if($draw_stdev==1){
 		if(defined $opts->{insert_size} && defined $opts->{stdev}){
 			$insert_size = $opts->{insert_size};
-			$deviation = $opts->{stdev};
+			$stdev = $opts->{stdev};
 		} elsif (defined $opts->{picard_file}){
 			my @lines = `head -n 8 $opts->{picard_file}`;
 			if($lines[6]!~/^MEDIAN_INSERT_SIZE/){ confess "Error: The Picard file doesn't look right. Please fix it and try agian.\n";}
-			($insert_size,$deviation) = (split/\t/,$lines[7])[0,1];
+			($insert_size,$stdev) = (split/\t/,$lines[7])[0,1];
 		} else {
 			confess "Error: Must use either (--insert_size=[#] & --stdev=[#]) or --picard_file=<file path with Picard insert metrics>\n";
 		}
@@ -555,6 +555,7 @@ sub draw_img {
 		$panel->add_track($nstring_feature,
 			-glyph 		=> 'crossbox',
 			-fgcolor 	=> 'black',
+			-bgcolor	=> '128,128,128'
 			);
 	}
 	## Right Reference
@@ -582,19 +583,22 @@ sub draw_img {
 		my $track;
 		if($draw_stdev==1){
 			my $read_insert_size = $pair->length;
-			my $variance = $insert_size - ($read_insert_size - $first_mate->length - $second_mate->length);
+			my $variance = $insert_size - $read_insert_size;
 			my $color;
-			if (abs($variance) < (.5 * $deviation)){
-				$color = 'green';
-			} elsif (abs($variance) <= $deviation){
-				$color = 'red' if $variance < 0;
-				$color = 'blue' if $variance > 0;
-			} elsif (abs($variance) <= (2 * $deviation)){
-				$color = 'orangered' if $variance <= 0;
-				$color = 'cyan' if $variance > 0;
-			} elsif (abs($variance) > (2 * $deviation)){
-				$color = 'gold' if $variance <= 0;
-				$color = 'powderblue' if $variance > 0;
+			if (abs($variance)==0){
+				$color = 'white';
+			} elsif (abs($variance) <= (.5 * $stdev)){
+				$color = '255,234,234' if $variance < 0;
+				$color = '234,255,234' if $variance > 0;
+			} elsif (abs($variance) <= $stdev){
+				$color = '255,140,140' if $variance < 0;
+				$color = '140,255,140' if $variance > 0;
+			} elsif (abs($variance) <= (2 * $stdev)){
+				$color = '255,0,0' if $variance <= 0;
+				$color = '0,255,0' if $variance > 0;
+			} elsif (abs($variance) > (2 * $stdev)){
+				$color = '170,0,0' if $variance <= 0;
+				$color = '0,170,0' if $variance > 0;
 			}
 			$track = $panel->add_track(
 							-glyph     => 'transcript2',
