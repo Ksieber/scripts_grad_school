@@ -3,6 +3,7 @@ use strict;
 use warnings;
 use Carp;
 $Carp::MaxArgLen = 0;
+use run_cmd;
 use Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT = qw( empty_chk );
@@ -21,11 +22,11 @@ sub empty_chk {
     my $empty = 0; ## 0 = False, 1=True, file is empty.
     my $count; 
     if($file=~/\.bam$/){
-    	$count = $self->_run_cmd("samtools view $file | head | wc -l");
+    	$count = run_cmd("samtools view $file | head | wc -l",0);
     } elsif ($file=~/\.gz/){
-    	$count = $self->_run_cmd("zcat $file | head | wc -l");
+    	$count = run_cmd("zcat $file | head | wc -l",0);
     } else {
-    	$count = $self->_run_cmd("head $file | wc -l");
+    	$count = run_cmd("head $file | wc -l",0);
     }
     if($count == 0){$empty=1;}
     return $empty;   

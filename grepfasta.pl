@@ -5,7 +5,7 @@ use strict;
 use Bio::DB::Fasta;
 use Bio::SeqIO;
 use Data::Dumper;
-use Bio::Index::Fastq2;
+use Bio::Index::Fastq;
 use IO::String;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options = ();
