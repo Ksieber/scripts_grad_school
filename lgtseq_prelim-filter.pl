@@ -22,8 +22,10 @@ The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with a _
 
 =cut
-#use warnings;
+use warnings;
 use strict;
+use Carp;
+$Carp::MaxArgLen = 0;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 our %options;
 my $results = GetOptions (\%options,
@@ -59,7 +61,7 @@ my $results = GetOptions (\%options,
 	'help_full'
 	);
 use print_call;
-print_hostname(\%options);									## This is useful for trouble shooting grid nodes that might be missing modules for LGTSeek etc. 
+# print_hostname(\%options);									## This is useful for trouble shooting grid nodes that might be missing modules for LGTSeek etc. 
 use Scalar::Util qw(reftype);
 use POSIX;
 use run_cmd;
@@ -85,7 +87,7 @@ if($options{help_full}){
 		--paired_end=		<0|1> [1] 1= Paired End Sequencing reads.
 		--prelim_filter= 	<0|1> [1] 1= Filter out M_M reads, keeping MU,UU,and SC. 
 		  --keep_softclip=	<0|1> [1] 1= Keep soft clipped reads >=24 bp (Reads potentially on LGT) 
-		--name_sort_input= 	<0|1> [1] 1= Resort the input bam by read names.  
+		--name_sort_input= 	<0|1> [0] 1= Resort the input bam by read names.  
 		  --sort_mem=		[5G] Mem per thread to sort with. 
 		  --threads=		[1] # of threads 
 		--split_bam=		<0|1> [1] 1= Split bam(s)
@@ -97,7 +99,7 @@ if($options{help_full}){
 		  --project=		<project> [jdhotopp-lab] SGE group project to submit command under.
 		  --sub_mem=		[7G] --sub_mem MUST >= (--threads * --sort_mem)
 		  --hostname=		Designate a specific host to run on
-		  --no_gal=		<0|1> [1] 1= Specify not to run on galactus b/c lgtseek fails w/ LGTSeek.pm
+		  --no_gal=		<0|1> [0] 1= Specify not to run on galactus b/c lgtseek fails w/ LGTSeek.pm
 		  --excl=		<0|1> [0] 1= Run exclusively on a node.
 		----------------------------------------------------------------------------------------
 		--output_dir=   	Directory for output. 
@@ -108,17 +110,16 @@ if($options{help_full}){
 		----------------------------------------------------------------------------------------
 		--bin_dir=     		[/local/projects-t3/HLGT/scripts/lgtseek/bin/] Directory where LGTSeek.pm is stored.
 		----------------------------------------------------------------------------------------
-		--verbose		<0|1> [1] 1= Verbose reporting of progress. 0 =Turns off reports. 
+		--verbose		<0|1> [0] 1= Verbose reporting of progress. 0 =Turns off reports. 
 		--help 			Basic Help Info
 		--help_full		Full Help Info
 		--conf_file=				[~/.lgtseek.conf]
 		----------------------------------------------------------------------------------------\n";
 }
 
-if(!$options{input} && !$options{input_list}){die "Error: Must give input with --input=<BAM> or --input_list=<LIST of bams>\n";}
+if(!$options{input} && !$options{input_list}){confess "Error: Must give input with --input=<BAM> or --input_list=<LIST of bams>\n";}
 
 ## Set default values
-$options{name_sort_input} = defined $options{name_sort_input} ? "$options{name_sort_input}" : "1";
 $options{prelim_filter}   = defined $options{prelim_filter}   ? "$options{prelim_filter}"   : "1";
 $options{keep_softclip}   = defined $options{keep_softclip}   ? "$options{keep_softclip}"   : "1";
 $options{split_bam}       = defined $options{split_bam}       ? "$options{split_bam}"       : "1";
@@ -126,6 +127,7 @@ $options{overwrite}       = defined $options{overwrite}       ? "$options{overwr
 $options{sub_mem}         = defined $options{sub_mem}         ? "$options{sub_mem}"         : "7G";
 $options{threads}         = defined $options{threads}         ? "$options{threads}"         : "1";
 $options{excl} 			  = defined $options{excl} 			  ? "$options{excl}" 			: "0";
+$options{output_list} = defined $options{output_list} ? "$options{output_list}" : "1";
 my $no_gal = undef;
 my $hostname = undef;
 if(defined $options{hostname}){
@@ -143,6 +145,7 @@ foreach my $input (@$input){
 	my ($fn,$path,$suf)=fileparse($input,('_resorted.bam','.bam'));
 	my $output_dir = $options{subdirs} ? "$options{output_dir}/$fn/" : $options{output_dir};
 	$lgtseek->_run_cmd("mkdir -p $output_dir");
+
 	
 	## Qsub this script foreach input and any of the options passed
 	if($lgtseek->{Qsub}==1){
@@ -164,26 +167,26 @@ foreach my $input (@$input){
 			next if($options{input_list} && $key=~/input_list/);			  ## If we are in the orignal call, we don't want to qsub more lists
 			if(defined $options{$key}){$cmd = $cmd." --$key=$options{$key}"};
 		}
-        $fn =~ /(\w{1,10})$/;
-        my $job_name = $1;
-
-        ## submit command to grid
+		$fn =~ /(\w{1,10})$/;
+		my $job_name = $1;
+		## submit command to grid
 		Qsub2({
 			cmd => "$cmd",
 			wd => "$output_dir",
 			name => "$job_name",
 			mem => "$options{sub_mem}",
 			threads => "$lgtseek->{threads}",
-            project => "$lgtseek->{project}",
-            hostname => "$hostname",
-            no_gal => "$no_gal",
-            excl => "$options{excl}",
-			});
+           			 project => "$lgtseek->{project}",
+		            hostname => "$hostname",
+		            no_gal => "$no_gal",
+		            excl => "$options{excl}",
+		});
 
 		## Skip to next input for qsub
 		next;									
 	}
 	
+	print_notebook(\%options);
 	## PrelimFilter to remove M_M reads. 
 	my $bams;
 	if($lgtseek->{prelim_filter}==1 || $lgtseek->{split_bam}==1 || $lgtseek->{name_sort_input}==1){
@@ -213,7 +216,7 @@ foreach my $input (@$input){
 	## Print out the output list
 	if($lgtseek->{output_list}==1){
 		# Open a list file to write the output bams to
-		open(my $olistfh, ">$output_dir/output.list") or die "Unable to open: $output_dir/output.list because: $!\n";
+		open(my $olistfh, ">$output_dir/output.list") or confess "Unable to open: $output_dir/output.list because: $!\n";
  		if($lgtseek->{encrypt}==1){foreach my $out (@encrypted){print $olistfh "$out\n";}} 
 		elsif ($lgtseek->{split_bam}==1 || $lgtseek->{prelim_filter}==1){foreach my $out2 (@$bams){print $olistfh "$out2\n";}}
 	}
