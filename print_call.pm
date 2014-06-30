@@ -51,7 +51,7 @@ sub print_hostname {
 sub print_notebook {
     my $options = shift;
     if ( $options->{output_dir} ) {
-        open( OUT, ">", "$options->{output_dir}/\_notebook.txt" )
+        open( OUT, ">>", "$options->{output_dir}/\_notebook.txt" )
             || die "Error: Unable to open output: $options->{output_dir}\_notebook.txt because: $!\n";
     }
     else {
