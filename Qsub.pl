@@ -3,7 +3,7 @@ use warnings;
 no warnings 'uninitialized';
 use strict;
 use run_cmd;
-use lib ('/home/ksieber/scripts/','/local/projects-t3/HLGT/scripts/lgtseek/');
+use lib ('/home/ksieber/scripts/','/local/projects-t3/HLGT/scripts/lgtseek/') or die "Error: Unrecognized command line option. Please try again.\n";
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
 my $results = GetOptions (\%options,

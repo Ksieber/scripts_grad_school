@@ -11,10 +11,11 @@ use File::Basename;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
 my $results = GetOptions (\%options,
-	'input=s',
-	'input_list=s',
-	'output_dir=s',
+	'input|i=s',
+	'input_list|I=s',
+	'output_dir|o=s',
 	'output_name=s',
+	'Qsub|Q=i',
 	'subdirs=s',
 	'conf_file=s',
 	'help',
@@ -24,15 +25,17 @@ if($options{help}){
 	die "Help:
 	This script will merge the output files of lgt_seq.pl.
 	----------------------------------------------------------------------------------------
-	--input=		Directory to merge files from. Subdirectories in this directory should contain lgt_seq.pl outputs.
-	--input_list=		List of input directories.
+	--input|i=		Directory to merge files from. Subdirectories in this directory should contain lgt_seq.pl outputs.
+	--input_list|I=		List of input directories.
 	----------------------------------------------------------------------------------------
-	--output_dir=		Directory for output.
+	--output_dir|o=		Directory for output.
 	  --subdirs=		<0|1> [0] 1= Make a new directory within output_dir for each input directory.
-	  --output_name=      Prefix name for the merged output. [Input dir name]
+	  --output_name=      	Prefix name for the merged output. [Input dir name]
+	----------------------------------------------------------------------------------------
+	--Qsub|Q=i 		<0|1> [0] 1= Qsub the job to the grid. 
 	----------------------------------------------------------------------------------------
 	--help
-	--conf_file=				[~/.lgtseek.conf]
+	--conf_file=		[~/.lgtseek.conf]
 	----------------------------------------------------------------------------------------\n";
 }
 
@@ -41,6 +44,8 @@ if(!$options{output_dir}){die "Must use --output_dir=\n";}
 my $subdirs = defined $options{subdirs} ? "1" : "0";
 my $input = setup_input(\%options);
 run_cmd("mkdir -p $options{output_dir}");
+
+if ( $options{Qsub} ) { Qsub3( \%options ) }
 
 my $lgtseek = LGTSeek->new2(\%options);
 

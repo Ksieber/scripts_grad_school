@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl
+#!/usr/bin/perl -I /home/ksieber/scripts/ -I /home/ksieber/perl5/lib/perl5/
 use warnings;
 use strict;
 use File::Basename;

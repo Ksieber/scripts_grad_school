@@ -25,7 +25,7 @@ if ($options{refloop_list}){
 }
 
 foreach my $file (@index_list){
-  $file =~ m/(NC_\d{6})/;
+  $file =~ m/(\w{2}_\d+)\.?\d?/;
   print STDERR "\nProcesssing $file";
   `bwa index -p $options{output_dir}$1 $file`;
   if ($options{refloop_list}){

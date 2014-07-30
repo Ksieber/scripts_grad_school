@@ -1,6 +1,7 @@
 package run_cmd;
 
-#use warnings;
+use warnings;
+no warnings 'uninitialized';
 use strict;
 use File::Basename;
 use Carp;
@@ -22,23 +23,23 @@ our @EXPORT = qw( run_cmd setup_logs Qsub Qsub2 Qsub3);
 ## Suggested use: run_cmd($cmd,$cmd_log->{$file});
 
 =head2 run_cmd
-	Title		: run_cmd
-	Usage		: run_cmd($cmd,$log);
-	Function	: qsub command with good error logging if it fails
-	Returns 	: return value for executing unix command
+    Title       : run_cmd
+    Usage       : run_cmd($cmd,$log);
+    Function    : qsub command with good error logging if it fails
+    Returns     : return value for executing unix command
 =cut 
 
 sub run_cmd {
     my ( $cmd, $log ) = @_;
     my $fh;
-    if (-e $log) {
+    if ( -e $log ) {
         open( $fh, ">>", "$log" ) or confess "Can't open: $fh because: $!\n";
-    } 
+    }
     else {
         $fh = *STDERR;
     }
 
-    unless ($log ==0){print $fh "CMD: $cmd\n";}
+    if ( -e $log ) { print $fh "CMD: $cmd\n"; }
     chomp( my $res = `$cmd` );
     if ($?) {
         confess "FAIL_CMD: $cmd died with message: $res\n";
@@ -47,12 +48,12 @@ sub run_cmd {
 }
 
 =head2 setup_logs
-	Title		: setup_logs
-	Usage		: setup_logs($output_dirs)	
-				  ## $output_dirs is a hash_ref: $hash{$file}=$output_directory
-	Function	: setup log name based on file and output dirs.
-	Returns 	: Hash_ref for log file based on file name
-					$return_value : $hash{$file}=$log_file
+    Title       : setup_logs
+    Usage       : setup_logs($output_dirs)  
+                  ## $output_dirs is a hash_ref: $hash{$file}=$output_directory
+    Function    : setup log name based on file and output dirs.
+    Returns     : Hash_ref for log file based on file name
+                    $return_value : $hash{$file}=$log_file
 
 =cut 
 
@@ -67,9 +68,9 @@ sub setup_logs {
 }
 
 =head2 Qsub
-	Title		: Qsub
-	Usage		: Qsub($cmd,$log);
-	Function	: qsub commands
+    Title       : Qsub
+    Usage       : Qsub($cmd,$log);
+    Function    : qsub commands
 =cut 
 
 sub Qsub {
@@ -99,21 +100,21 @@ sub Qsub {
 }
 
 =head2 Qsub2 
-	Title		: Qsub2
-	Usage		: Qsub2({ cmd => $cmd, threads => $threads });
-	Function	: qsub but with greater control than &Qsub
-	Args	:
-		cmd 	 	=> command/shell script to be qsub'ed
-		log 	 	=> file to log the qsub command in.
-		name	 	=> Job Name.
-		threads	 	=> # cpu threads to use.
-		mem		 	=> Memory free @ start.
-	 	project	 	=> grid project to use.
-		cwd		 	=> <0|1> [0] 1= Use current working directory to work from.
-		wd 		 	=> Directory for grid to work from.
-		hostname 	=> Hostname to run on. ex: => "grid*"
-		no_gal	 	=> <0|1> [0] 1= Don't run on galactus. ie hostname="magneto|juggernaut|grid*"
-		excl		=> <0|1> [0] 1= Run exclusively on a node.
+    Title       : Qsub2
+    Usage       : Qsub2({ cmd => $cmd, threads => $threads });
+    Function    : qsub but with greater control than &Qsub
+    Args    :
+        cmd         => command/shell script to be qsub'ed
+        log         => file to log the qsub command in.
+        sub_name        => Job Name.
+        threads     => # cpu threads to use.
+        mem         => Memory free @ start.
+        project     => grid project to use.
+        cwd         => <0|1> [0] 1= Use current working directory to work from.
+        wd          => Directory for grid to work from.
+        hostname    => Hostname to run on. ex: => "grid*"
+        no_gal      => <0|1> [0] 1= Don't run on galactus. ie hostname="magneto|juggernaut|grid*"
+        excl        => <0|1> [0] 1= Run exclusively on a node.
 =cut 
 
 sub Qsub2 {
@@ -128,7 +129,7 @@ sub Qsub2 {
     my $mem      = defined $config->{mem}      ? " -l mf=$config->{mem}"                : undef;
     my $project  = defined $config->{project}  ? " -P $config->{project}"               : " -P jdhotopp-lab";
     my $cwd      = defined $config->{cwd}      ? " -cwd"                                : undef;
-    my $name     = defined $config->{name}     ? " -N $config->{name}"                  : " -N Foobar";
+    my $sub_name = defined $config->{sub_name} ? " -N $config->{sub_name}"              : undef;
     my $hostname = defined $config->{hostname} ? " -l hostname=\"$config->{hostname}\"" : undef;
 
     if ( $config->{no_gal} == 1 ) {
@@ -145,7 +146,7 @@ sub Qsub2 {
     else {
         $fh = *STDERR;
     }
-    my $qsub = "qsub -V$name$project$wd$cwd$mem$threads$hostname$exclusive";
+    my $qsub = "qsub -V$sub_name$project$wd$cwd$mem$threads$hostname$exclusive";
     print $fh "QSUB: echo \"$cmd\" | $qsub\n";
     my $que;
     if ( $cmd =~ /\.sh$/ ) {
@@ -165,24 +166,24 @@ sub Qsub2 {
 }
 
 =head2 Qsub3
-	Title		: Qsub3
-	Usage		: Qsub3(\%options);
-	Function	: This Qsub is used ONLY to resubmit the same script call back to the grid.
-	Args		: \%hash with:
-			--input=s
-			--input_list=s
-			--output_dir=s
-			--subdirs=i
-			--Qsub=i
-			--threads=i
-			--sub_mem=s
-			--sub_name=s
-			--project=s
-			--wd=s
-			--cwd=i
-			--hostname=s
-			--excl=i
-			--no_gal=i
+    Title       : Qsub3
+    Usage       : Qsub3(\%options);
+    Function    : This Qsub is used ONLY to resubmit the same script call back to the grid.
+    Args        : \%hash with:
+            --input=s
+            --input_list=s
+            --output_dir=s
+            --subdirs=i
+            --Qsub=i
+            --threads=i
+            --sub_mem=s
+            --sub_name=s
+            --project=s
+            --wd=s
+            --cwd=i
+            --hostname=s
+            --excl=i
+            --no_gal=i
 =cut 
 
 sub Qsub3 {
@@ -195,10 +196,10 @@ sub Qsub3 {
     $opts->{threads} = undef;
     my $t = defined $options->{threads} ? $options->{threads} : 1;
     if ( $t >= 2 ) { $opts->{threads} = " -pe thread $t -q threaded.q"; }
-    $opts->{mem}     = defined $options->{sub_mem} ? " -l mf=$options->{sub_mem}" : undef;
-    $opts->{project} = defined $options->{project} ? " -P $options->{project}"    : " -P jdhotopp-lab";
-    $opts->{cwd}     = defined $options->{cwd}     ? " -cwd"                      : undef;
-    $opts->{name} = defined $options->{sub_name} ? " -N $options->{sub_name}" : undef;    ## KBS 01.07.14 " -N ksieber";
+    $opts->{mem}      = defined $options->{sub_mem}  ? " -l mf=$options->{sub_mem}"            : undef;
+    $opts->{project}  = defined $options->{project}  ? " -P $options->{project}"               : " -P jdhotopp-lab";
+    $opts->{cwd}      = defined $options->{cwd}      ? " -cwd"                                 : undef;
+    $opts->{sub_name} = defined $options->{sub_name} ? " -N $options->{sub_name}"              : undef;                ## KBS 01.07.14 " -N ksieber";
     $opts->{hostname} = defined $options->{hostname} ? " -l hostname=\"$options->{hostname}\"" : undef;
     if ( $options->{no_gal} == 1 ) { $opts->{hostname} = " -l hostname=\"magneto|grid*\""; }
     $opts->{exclusive} = undef;
@@ -213,7 +214,7 @@ sub Qsub3 {
     }
 
     ## Setup input and output dirs
-    if ( !$options->{input} && !$options->{input_list} ) {
+    if ( !$options->{input} && !$options->{input_list} && !$options->{bam} && !$options->{fasta} ) {
         confess "Error: No input given. Use --input or --input_list.\n";
     }
     if ( !$options->{output_dir} ) { confess "Error: No output directory given. Use --output_dir.\n"; }
@@ -234,6 +235,13 @@ sub Qsub3 {
     if ( $options->{input} ) {
         push( @inputList, $options->{input} );
     }
+    elsif ( $options->{bam} ) {
+        push( @inputList, $options->{bam} );
+    }
+    elsif ( $options->{fasta} ) {
+        push( @inputList, $options->{fasta} );
+    }
+
     my $original_output_dir = $options->{output_dir};
     run_cmd("mkdir -p $options->{output_dir}");
 
@@ -246,11 +254,12 @@ sub Qsub3 {
                 $options->{output_dir} = $out_dirs{$input};
                 run_cmd("mkdir -p $out_dirs{$input}");
             }
-             $options->{output_dir} = "$options->{output_dir}\/" . "$name\/";
-             run_cmd("mkdir -p $options->{output_dir}");
-        } else {
-             $options->{output_dir} = "$options->{output_dir}\/" . "$name\/";
-             run_cmd("mkdir -p $options->{output_dir}");
+            $options->{output_dir} = "$options->{output_dir}\/" . "$name\/";
+            run_cmd("mkdir -p $options->{output_dir}");
+        }
+        else {
+            $options->{output_dir} = "$options->{output_dir}\/" . "$name\/";
+            run_cmd("mkdir -p $options->{output_dir}");
         }
         my $qsub_dir = defined $options->{cwd} ? undef : "-wd $options->{output_dir}";
         if ( $options->{input_list} ) {
@@ -261,6 +270,7 @@ sub Qsub3 {
             next if ( $key eq 'input_list' );
             next if ( $key eq 'Qsub' );
             next if ( $key eq 'subdirs' );
+            next if ( $key eq 'tcga_dirs' );
             next if ( $key eq 'excl' );
             next if ( $key eq 'no_gal' );
             next if ( $key eq 'sub_mem' );
@@ -280,7 +290,7 @@ sub Qsub3 {
             print STDERR "$?\n";
             confess "Error: $que died with message: $report\n";
         }
-        print STDERR "QSUB: $report\n";
+        print STDERR "QSUB: $report\n\n";
         sleep 2;
     }
     die "+++ Finished submiting all jobs for: $0 +++\n";

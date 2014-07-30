@@ -195,7 +195,7 @@ sub bwa_align {
     }
     my $retval = defined $options->{sort_index} ? "$output_prefix\.srt.bam" : "$output_prefix\.bam";
 
-    print STDERR "====== Completed BWA mapping: $file1 against: $ref output: $output_prefix\.bam ======\n";
+    # print STDERR "====== Completed BWA mapping: $file1 against: $ref output: $output_prefix\.bam ======\n";
     return $retval;
 }
 

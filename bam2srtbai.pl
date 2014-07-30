@@ -57,7 +57,7 @@ if($Qsub==1){
 		threads => "$threads",
 		no_gal => 1,
 	});
-	die "Job sugmitted to the grid.\n";
+	die "Job submitted to the grid.\n";
 }
 
 

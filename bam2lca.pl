@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -I /home/ksieber/perl5/lib/perl5/ -I /home/ksieber/scripts/
 
 =head1 NAME
 

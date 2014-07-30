@@ -7,13 +7,13 @@ use Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT = qw( read_in_list );
 
-=head2 &empty_chk
+=head2 &read_in_list
 
- Title   : empty_chk
- Usage   : if(empty_chk($file)== 1){die "File is empty\n";}
- Function: Check to make sure a file is not empty
- Returns : 1 = Empty; 0 = input is not empty
- Args    : File to check;
+ Title   : read_in_list
+ Usage   : 
+ Function: 
+ Returns : 
+ Args    : 
 =cut
 sub read_in_list {
     my $file = shift;
