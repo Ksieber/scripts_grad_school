@@ -8,7 +8,7 @@ use Carp;
 $Carp::MaxArgLen = 0;    ## Report full length error
 use Exporter;
 our @ISA    = qw(Exporter);
-our @EXPORT = qw( run_cmd setup_logs Qsub Qsub2 Qsub3 Qsub4);
+our @EXPORT = qw( run_cmd setup_logs Qsub Qsub Qsub3 Qsub4);
 ## &run_cmd records a unix cmd, executes it, checks it did not fail
 ## &run_cmd can also take a fh to log the commands to the fh
 ## &setup_logs takes a hash ref. of input=>output_dirs and returns a hash reference (input=>fh);
@@ -99,9 +99,9 @@ sub Qsub {
     return $report;
 }
 
-=head2 Qsub2 
-    Title       : Qsub2
-    Usage       : Qsub2({ cmd => $cmd, threads => $threads });
+=head2 Qsub 
+    Title       : Qsub
+    Usage       : Qsub({ cmd => $cmd, threads => $threads });
     Function    : qsub a command advanced options 
     Args    :
         cmd         => command/shell script to be qsub'ed
@@ -116,7 +116,7 @@ sub Qsub {
         excl        => <0|1> [0] 1= Run exclusively on a node. **WARNING** Use sparingly. 
 =cut 
 
-sub Qsub2 {
+sub Qsub {
     my $config = $_[0];
     if ( !$config->{cmd} ) { confess "Must use cmd => <Command to qsub>. Please Fix.\n"; }
     my $cmd     = $config->{cmd};
