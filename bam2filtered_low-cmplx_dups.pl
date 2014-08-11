@@ -92,7 +92,7 @@ foreach my $input (@$input){
 			if(defined $options{$key}){$cmd = $cmd." --$key=$options{$key}"};
 		}
 	    ## submit command to grid
-	    Qsub2({
+	    Qsub({
 	    	cmd => "$cmd",
 	    	wd => "$output_dir",
 	    	name => "bam2filter",

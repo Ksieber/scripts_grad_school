@@ -108,7 +108,7 @@ foreach my $input (@$inputs){
 			next if ($key=~/Qsub/ && !$options{input_list});			    ## If we are in the orignal call with input_list, we probably want to qsub each input
 			if($options{$key}){$cmd = $cmd." --$key=$options{$key}"};		## Build the command for all other options passed in @ original call
 		}
-		Qsub2({
+		Qsub({
 			cmd => $cmd,
 			threads => "$lgtseek->{threads}",
 			wd => "$lgtseek->{output_dir}",
@@ -155,6 +155,6 @@ sub help {die "Help: This script will take bam and find the bwa-lca.
 	____/Submit to SGE-grid\\_____________________________________________________________________
 		--Qsub=				<0|1> [0] 1= qsub the job to the grid.
 		  --threads=			# of threads to use for bwa sampe.
-		  --job_name=			[(w+)[1..10]$] Must start with a letter character 
+		  --job_name=			
 	_____________________________________________________________________________________________\n";
 }

@@ -34,7 +34,7 @@ my $results = GetOptions(
     'prelim_filter=i', 'seqs_per_file=i', 'keep_softclip=i', 'Qsub|Q=i',          'excl=i',              'sub_mem=s',     'sub_name=s',    'threads|t=i',
     'projects=s',      'output_dir|o=s',  'subdirs=i',       'overwrite=s',       'samtools_bin=s',      'ergatis_dir=s', 'output_list=s', 'bin_dir=s',
     'fs=s',            'clovr=s',         'diag',            'verbose=i',         'print_hostname|ph=i', 'config_file=s', 'help|h',        'help_full',
-    'tcga_dirs=i',     'aln_human=i',     'hg19_ref=s',      'no_gal=i',          'hostname=s',
+    'tcga_dirs=i',     'aln_human=i',     'hg19_ref=s',      'no_gal=i',          'hostname=s',          'sub_mail=s',
 ) or die "Error: Unrecognized command line option. Please try again.\n";
 use print_call;
 
@@ -68,7 +68,7 @@ if ( $options{help_full} ) {
         --prelim_filter=    <0|1> [1] 1= Filter out M_M reads, keeping MU,UU,and SC. 
           --keep_softclip=  <0|1> [1] 1= Keep soft clipped reads >=24 bp (Reads potentially on LGT) 
         --name_sort_input=  <0|1> [0] 1= Resort the input bam by read names.  
-          --sort_mem=       [5G] Mem per thread to sort with. 
+          --sort_mem=       [1G] Mem per thread to sort with. 
           --threads=        [1] # of threads 
         --split_bam=        <0|1> [1] 1= Split bam(s)
           --seqs_per_file=  <lines per bam> [50,000,000]
@@ -77,13 +77,14 @@ if ( $options{help_full} ) {
         ----------------------------------------------------------------------------------------
         --Qsub|Q=           <0|1> [0] 1= Qsub this script for each input. 
           --project=        <project> [jdhotopp-lab] SGE group project to submit command under.
-          --sub_mem=        [7G] --sub_mem MUST >= (--threads * --sort_mem)
+          --sub_mem=        [5G] --sub_mem MUST >= (--threads * --sort_mem)
           --sub_name=       < > Name of the SGE Job.
+          --sub_mail=       [0] 1= email user\@som.umaryland.edu when job is complete & with stats. Can also specify --sub_mail=specific\@email.foo
         ----------------------------------------------------------------------------------------
-        --output_dir|o=     Directory for output. 
-          --subdirs=        <0|1> [0] 1= Make a directory under the output_dir to place the output. 
-          --tcga_dirs=      <0|1> [0] 1= Make the sub-dir prefix = input's last folder in path (Maintain TCGA analysis_id directory structure)
-          --output_list=    <0|1> [1] 1= Make a list of the output created.
+        --output_dir|o=     Directory for all output. Example: /path/to/{output_dir}/{tcga_dirs}/{subdirs}/ || /path/to/{output_dir}/{subdirs}/
+         --tcga_dirs=       <0|1> [0] 1= Make the sub-dir prefix the input's last folder in path (Maintain TCGA analysis_id directory structure)
+          --subdirs=        <0|1> [0] 1= Make the sub-dir prefix in output_dir based on input name.
+        --output_list=      <0|1> [1] 1= Make a list of the output created.
         ----------------------------------------------------------------------------------------
         --overwrite=        <0|1> [0] 1= Overwrite previous files.
         ----------------------------------------------------------------------------------------
@@ -100,37 +101,27 @@ if ( !$options{input} && !$options{input_list} ) { confess "Error: Must give inp
 
 ## Set default values
 $options{prelim_filter} = defined $options{prelim_filter} ? "$options{prelim_filter}" : "1";
-$options{keep_softclip} = defined $options{keep_softclip} ? "$options{keep_softclip}" : "1";
-$options{split_bam}     = defined $options{split_bam}     ? "$options{split_bam}"     : "1";
-$options{overwrite}     = defined $options{overwrite}     ? "$options{overwrite}"     : "0";
-$options{sub_mem}       = defined $options{sub_mem}       ? "$options{sub_mem}"       : "7G";
-$options{threads}       = defined $options{threads}       ? "$options{threads}"       : "1";
-$options{excl}          = defined $options{excl}          ? "$options{excl}"          : "0";
+$options{sub_mem}       = defined $options{sub_mem}       ? "$options{sub_mem}"       : "5G";
 $options{output_list}   = defined $options{output_list}   ? "$options{output_list}"   : "1";
-$options{tcga_dirs}     = defined $options{tcga_dirs}     ? "$options{tcga_dirs}"     : "0";
 
 my $lgtseek = LGTSeek->new2( \%options );
-
-my $no_gal = undef;
-my $hostname = ( defined $options{hostname} ) ? "$options{hostname}" : "*";
-if   ( defined $options{hostname} ) { $no_gal = "0"; }
-else                                { $no_gal = defined $options{no_gal} ? "$options{no_gal}" : "0"; }
 
 my $input = setup_input( \%options );    ## $input is a array ref.
 my $x     = 0;
 
+my $original_output_dir = $lgtseek->{output_dir};
+
 foreach my $input (@$input) {
     $x++;
     my ( $fn, $path, $suf ) = fileparse( $input, ( '_resorted.bam', '.bam' ) );
-
-    if ( $lgtseek->{tcga_dirs} == 1 ) {
-        $lgtseek->{subdirs} = 1;
-        $path =~ /.*\/([\w\-]+)\/{0,1}$/;
-        $options{output_dir} = $options{output_dir} . "$1\/";
-    }
-
-    my $output_dir = $options{subdirs} ? "$options{output_dir}/$fn/" : $options{output_dir};
-    $lgtseek->_run_cmd("mkdir -m u=rwx,g=rwx,o= -p $output_dir");
+    my $subdir     = $fn;
+    my @split_path = split( /\//, $path );
+    my $tcga_dir   = $split_path[-1];
+    $lgtseek->{output_dir} = $original_output_dir;
+    if ( $lgtseek->{tcga_dirs} == 1 ) { $lgtseek->{output_dir} = $lgtseek->{output_dir} . "$tcga_dir\/"; }
+    if ( $lgtseek->{subdirs} == 1 )   { $lgtseek->{output_dir} = $lgtseek->{output_dir} . "$subdir\/"; }
+    $options{output_dir} = $lgtseek->{output_dir};
+    $lgtseek->_run_cmd("mkdir -p -m u=rwx,g=rwx,o= $lgtseek->{output_dir}");
 
     ## Qsub this script foreach input and any of the options passed
     if ( $lgtseek->{Qsub} == 1 ) {
@@ -153,21 +144,22 @@ foreach my $input (@$input) {
         my $cmd = "$^X $0";
         foreach my $key ( keys %options ) {
             next if ( $key =~ /Qsub/ );
+            next if ( $key =~ /subdirs/ );
+            next if ( $key =~ /tcga_dirs/ );
             next if ( $options{input_list} && $key =~ /input_list/ );    ## If we are in the orignal call, we don't want to qsub more lists
             if ( defined $options{$key} ) { $cmd = $cmd . " --$key=$options{$key}" }
         }
         my $sub_name = $options{sub_name} ? $options{sub_name} : "prelim$x";
         ## submit command to grid
-        Qsub2(
-            {   cmd      => "$cmd",
-                wd       => "$output_dir",
-                sub_name => "$sub_name",
-                mem      => "$options{sub_mem}",
-                threads  => "$lgtseek->{threads}",
-                project  => "$lgtseek->{project}",
-                hostname => "$hostname",
-                no_gal   => "$no_gal",
-                excl     => "$options{excl}",
+        Qsub(
+            {   cmd      => $cmd,
+                wd       => $lgtseek->{output_dir},
+                sub_name => $sub_name,
+                sub_mem  => $options{sub_mem},
+                threads  => $lgtseek->{threads},
+                project  => $lgtseek->{project},
+                hostname => $options{hostname},
+                excl     => $options{excl},
             }
         );
 
@@ -175,6 +167,7 @@ foreach my $input (@$input) {
         next;
     }
 
+    $options{output_dir} = $lgtseek->{output_dir};
     print_notebook( \%options );
 
     # Align to Human.
@@ -221,9 +214,9 @@ foreach my $input (@$input) {
     if ( $lgtseek->{prelim_filter} == 1 || $lgtseek->{split_bam} == 1 || $lgtseek->{name_sort_input} == 1 ) {
         $bams = $lgtseek->prelim_filter(
             {   input_bam       => $input,
-                output_dir      => $output_dir,
+                output_dir      => $lgtseek->{output_dir},
                 name_sort_input => $lgtseek->{name_sort_input},    ## Default = 0
-                sort_mem        => $lgtseek->{sort_mem},           ## Default = 10G lgtseek default.
+                sort_mem        => $lgtseek->{sort_mem},           ## Default = 1G lgtseek default.
                 split_bam       => $lgtseek->{split_bam},          ## Default = 1
                 seqs_per_file   => $lgtseek->{seqs_per_file},      ## Default = 50M
                 keep_softclip   => $lgtseek->{keep_softclip},      ## Default = 1
@@ -247,7 +240,7 @@ foreach my $input (@$input) {
     if ( $lgtseek->{output_list} == 1 ) {
 
         # Open a list file to write the output bams to
-        open( my $olistfh, ">$output_dir/output.list" ) or confess "Unable to open: $output_dir/output.list because: $!\n";
+        open( my $olistfh, ">$lgtseek->{output_dir}/output.list" ) or confess "Unable to open: $lgtseek->{output_dir}/output.list because: $!\n";
         if ( $lgtseek->{encrypt} == 1 ) {
             foreach my $out (@encrypted) { print $olistfh "$out\n"; }
         }
@@ -261,3 +254,6 @@ foreach my $input (@$input) {
 
 __END__
 
+# my $hostname = ( defined $options{hostname} ) ? "$options{hostname}" : "*";
+# if   ( defined $options{hostname} ) { $no_gal = "0"; }
+# else                                { $no_gal = defined $options{no_gal} ? "$options{no_gal}" : "0"; }

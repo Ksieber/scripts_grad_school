@@ -41,6 +41,7 @@ my $results = GetOptions(
     'taxon_idx_dir=s',
     'path_to_blastdb=s',
     'Qsub=i',
+    'sub_mail=s',
     'conf_file=s',
     'print_hostname|ph=i',
     'help|h'
@@ -59,7 +60,7 @@ if ( $options{help} ) { &help(); }
 
 #if(!$options{input}){die "Error: Please give an input with --input=<.fa or .bam>. Try again or use --help.\n";} ## KBS 01.17.14
 
-if ( $options{Qsub} == 1 ) { Qsub3( \%options ) }
+if ( $options{Qsub} == 1 ) { Qsub_script( \%options ) }
 print_call( \%options );
 
 # Create an lgtseek object
@@ -144,19 +145,20 @@ print_complete( \%options );
 
 sub help {
     die "Help: This script will takes a bam and identifies bacterial human LGT.
-		--input|i=				< BAM, FASTA, or blast_list_file >
-		--output_dir|o=				</dir/for/output/> [cwd]
-		--prinseq_filter=			<0|1> [0] 1=prinseq_filter input bam (not implemented for fasta yet)
-		--Qsub=						<0|1> [0] 1=Submit job to SGE grid. 
-		--taxon_host=
-		--taxon_dir=
-		--taxon_idx_dir=
-		--path_to_blastdb=
-		--bin_dir=
-		--samtools_bin=
-		--ergatis_bin=
-		--conf_file=				[~/.lgtseek.conf]
-		--help\n";
+        --input|i=              < BAM, FASTA, or blast_list_file >
+        --output_dir|o=             </dir/for/output/> [cwd]
+        --prinseq_filter=           <0|1> [0] 1=prinseq_filter input bam (not implemented for fasta yet)
+        --Qsub=                     <0|1> [0] 1=Submit job to SGE grid.
+         --sub_mail=             [0] 1= email user\@som.umaryland.edu when job is complete & with stats. Can also specify --sub_mail=specific\@email.foo 
+        --taxon_host=
+        --taxon_dir=
+        --taxon_idx_dir=
+        --path_to_blastdb=
+        --bin_dir=
+        --samtools_bin=
+        --ergatis_bin=
+        --conf_file=                [~/.lgtseek.conf]
+        --help\n";
 }
 
 __END__

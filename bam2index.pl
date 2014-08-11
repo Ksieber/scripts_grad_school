@@ -39,7 +39,7 @@ my $Qsub = defined $options{Qsub} ? $options{Qsub} : 0;
 my $cmd= "samtools index $input $out\.bai";
 
 if($Qsub==1){
-      Qsub2({
+      Qsub({
             cmd => $cmd,
             sub_name => "indexbam"
             })

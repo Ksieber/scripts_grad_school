@@ -77,7 +77,7 @@ if($Qsub==1){
 	}
 	$fn =~ /(\w{1,10})$/;                                             ## Grab the last 1-10 character of the input name to use as the job_name
 	my $job_name = $1;
-	Qsub2({
+	Qsub({
 		cmd => $cmd,
 		wd => "$options{output_dir}",
 		name => "$job_name",

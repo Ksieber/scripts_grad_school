@@ -11,7 +11,7 @@ our $results = GetOptions(
     \%options,     'input|i=s',    'input_list=s', 'output_prefix=s',     'output_dir|o=s', 'subdirs=s',    'ref|r=s',          'ref_list=s',
     'threads|t=s', 'disable_SW=s', 'bam_output=s', 'sort_index_output=s', 'mpileup=s',      'no_cleanup=s', 'insert_metrics=s', 'mapped_only=s',
     'cmd_log=s',   'Qsub|Q=i',     'name=s',       'project=s',           'sub_mem=s',      'help|h',       'help_full',        'name_sort_input=i',
-    'sort_mem=s',
+    'sort_mem=s',  'sub_mail=s',
 ) or die "Error: Unrecognized command line option. Please try again.\n";
 
 ## Help subroutines (at the end of the sciprt)
@@ -92,7 +92,7 @@ foreach my $files (@$input) {
                 ;                                                           ## Build the command for all other options passed in @ original call
             }
             my $job_name = defined $options{name} ? "$options{name}" : "BWA_aln";
-            Qsub2(
+            Qsub(
                 {   cmd      => "$cmd",
                     threads  => "$threads",
                     mem      => "$sub_mem",
@@ -231,27 +231,28 @@ sub help {
 
 sub help_full {
     die "\nHELP: This script will align the input (fastq/bam) to a reference.
-    --input|i=          Input file to be BWA mapped. Either: in.bam or in_1.fq,in_2.fq
+    --input|i=              Input file to be BWA mapped. Either: in.bam or in_1.fq,in_2.fq
     --input_list=           List of input files to be mapped. 1 bam/line. _1,_2 fastq/line (fastqs MUST be comma seperated).
-    --ref|r=            Reference.fna+index
-    --ref_list=         List of References.
+    --ref|r=                Reference.fna+index
+    --ref_list=             List of References.
     --output_prefix=        Prefix for each output.  Ie. (SRA_LGT)_at_\$ref_name
     --output_dir|o=         Will output to current working directory unless another is specified with this. ie. /ksieber_dir/tmp/
-    --subdirs=          <0|1> [0] 1= Make subdirectories for each input file to be mapped. 
+    --subdirs=              <0|1> [0] 1= Make subdirectories for each input file to be mapped. 
     --disable_SW=           <0|1> [0] 1= Disable Smith-Waterman for the UM mate. Ideal for quicker LGT mappings IF they are high confidence. 
     --mapped_only=          <0|1> [0] 1= Only keep mates with 1 mapped read.
     --sam_output=           <0|1> [0] 0= .bam output; 1= .sam output
-    --sort_index_output=           <0|1> [0] 1= Sort and index the new.bam into new.srt.bam and new.srt.bai. 
-    --mpileup=          <0|1> [0] 1= Calculate pileup coverage on .bam.
+    --sort_index_output=    <0|1> [0] 1= Sort and index the new.bam into new.srt.bam and new.srt.bai. 
+    --mpileup=              <0|1> [0] 1= Calculate pileup coverage on .bam.
     --no_cleanup=           <0|1> [0] 0= Removes .sai files and unsorted.bam with --sort_index_output. 1=No deleting intermediate data. 
     --insert_metrics=       <0|1> [0] 1= Use Picard to calculate insert size metrics.
-    --Qsub|Q=           <0|1> [0] 1= qsub the mapping to SGE grid.
+    --Qsub|Q=               <0|1> [0] 1= qsub the mapping to SGE grid.
       --threads|t=          < # >   [1] Set the number of cpu threads to use for bwa aln steps. USE CAREFULLY.
       --project=            [jdhotopp-lab].
       --sub_mem=            [6G] Memory free for qsub.
-      --name=           Name qsub submission.
-      --wd=             [--output_dir]
-    --cmd_log=          <0|1> [0] 1= Log all commands run in each output_dir/output_prefix.cmd_log  
+      --sub_mail=           [0] 1= email user\@som.umaryland.edu when job is complete & with stats. Can also specify --sub_mail=specific\@email.foo
+      --sub_name=           Name qsub submission.
+      --wd=                 [--output_dir]
+    --cmd_log=              <0|1> [0] 1= Log all commands run in each output_dir/output_prefix.cmd_log  
     --help\n";
 }
 

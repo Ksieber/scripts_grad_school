@@ -96,7 +96,7 @@ if ( $options{bam2_region} ) {
 
 if ( $options{Qsub} ) {
     $options{sub_name} = defined $options{sub_name} ? $options{sub_name} : "mergeLGTbams";
-    Qsub3( \%options );
+    Qsub_script( \%options );
 }
 print_call( \%options );
 

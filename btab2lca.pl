@@ -22,7 +22,7 @@ use run_cmd;
 use print_call;
 use MultipleFileHandles;
 
-if($options{Qsub}){ &Qsub3(\%options) };
+if($options{Qsub}){ &Qsub_script(\%options) };
 
 use Carp;
 $Carp::MaxArgLen = 0;

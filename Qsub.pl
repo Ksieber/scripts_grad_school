@@ -32,7 +32,7 @@ if($options{help}){die
 while(<>){
 	chomp;
 	my $cmd = defined $options{cmd} ? "$options{cmd}" : "$_";
-	my $report = Qsub2({ 
+	my $report = Qsub({ 
 		cmd => $cmd, 
 		log => $options{log}, 
 		name => $options{name}, 

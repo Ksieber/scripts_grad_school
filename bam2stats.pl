@@ -63,7 +63,7 @@ foreach my $input (@$input){
 			$output_dir=run_cmd("pwd");
 		}
 	    ## submit command to grid
-	    Qsub2({
+	    Qsub({
 	    	cmd => "$cmd",
 	    	wd => "$output_dir",
 	    	});

@@ -32,7 +32,7 @@ my $results = GetOptions(
     'aln1_human=i',   'aln2_human=i',        'split_bac_list=s', 'hg19_ref=s',      'refseq_list=s',     'output_dir|o=s',    'subdirs=i',        'tcga_dirs=i',
     'lgt_coverage=i', 'max_overlap=i',       'min_length=i',     'bin_dir=s',       'samtools_bin=s',    'ergatis_bin=s',     'prinseq_bin=s',    'donor_lineage=s',
     'host_lineage=s', 'threads|t=i',         'taxon_host=s',     'taxon_dir=s',     'taxon_idx_dir=s',   'path_to_blastdb=s', 'best_hits_only=i', 'evalue_cutoff=s',
-    'verbose|V=i',    'print_hostname|ph=i', 'conf_file=s',      'help|h',          'help_full|H',       'workflow_help',     'conf_help',
+    'verbose|V=i',    'print_hostname|ph=i', 'conf_file=s',      'help|h',          'help_full|H',       'workflow_help',     'conf_help',        'sub_mail=s',
 ) or die "Error: Unrecognized command line option. Please try again.\n";
 
 ## Check if the user needs help information
@@ -62,10 +62,10 @@ if ( !$options{output_dir} ) {
     print "It is HIGHLY recommended you STOP, restart, and use a --output_dir=</some/path/>.\n";
     sleep 60;
 }
-if ( !$options{sub_name} ) { $options{sub_name} = "lgtseq"; }
 
 ## Qsub the job instead of running it
-if ( $options{Qsub} ) { Qsub3( \%options ); }
+if ( !$options{sub_name} ) { $options{sub_name} = "lgtseq"; }
+if ( $options{Qsub} ) { Qsub_script( \%options ); }
 
 ## Print the script call
 print_call( \%options );
@@ -78,21 +78,15 @@ foreach my $input (@$inputs) {
     my ( $name, $path, $suf ) = fileparse( $input, $lgtseek->{suffix_regex} );
     chomp $name;
 
-    # $path =~ /(\w+)$/;
     ## Setup output directory
     if ( !$lgtseek->{output_dir} ) { $lgtseek->{output_dir} = "$path/lgtseq/"; }
+    my $subdir     = $name;
+    my @split_path = split( /\//, $path );
+    my $tcga_dir   = $split_path[-1];
+    if ( $lgtseek->{tcga_dirs} == 1 ) { $lgtseek->{output_dir} = $lgtseek->{output_dir} . "$tcga_dir\/"; }
+    if ( $lgtseek->{subdirs} == 1 )   { $lgtseek->{output_dir} = $lgtseek->{output_dir} . "$subdir\/"; }
+    run_cmd("mkdir -p -m u=rwx,g=rwx,o= $lgtseek->{output_dir}");
 
-    if ( $lgtseek->{tcga_dirs} == 1 ) {
-        $lgtseek->{subdirs} = 1;
-        $path =~ /.*\/([\w\-]+)\/{0,1}$/;
-        $lgtseek->{output_dir} = "$options{output_dir}/" . "$1\/";
-    }
-    $lgtseek->_run_cmd("mkdir -p -m u=rwx,g=rx,o= $lgtseek->{output_dir}");
-    if ( $lgtseek->{subdirs} ) {
-        $lgtseek->{output_dir} = "$lgtseek->{output_dir}/" . "$name\/";
-        $options{output_dir} = $lgtseek->{output_dir};
-        $lgtseek->_run_cmd("mkdir -p -m u=rwx,g=rx,o= $lgtseek->{output_dir}");
-    }
     print_notebook( \%options );
 
     # Primary aln to Human.
@@ -141,7 +135,7 @@ foreach my $input (@$inputs) {
                 input_bam       => $input,
                 output_dir      => "$lgtseek->{output_dir}/prelim_filter/",    ## vv lgtseek &prelim_filter defaults vv
                 name_sort_input => $lgtseek->{name_sort_input},                ## Default = 0
-                sort_mem        => $lgtseek->{sort_mem},                       ## Default = 10G lgtseek default. lgt_prep overides to 40G.
+                sort_mem        => $lgtseek->{sort_mem},                       ## Default = 1G lgtseek default. lgt_prep overides to 40G.
                 threads         => $lgtseek->{threads},                        ## Default = 1
                 split_bam       => "0",                                        ## Default = 1
                 keep_softclip   => $lgtseek->{keep_softclip},                  ## Default = 1, better to split with lgt_seq_prelim
@@ -357,7 +351,7 @@ foreach my $input (@$inputs) {
         );
 
     }
-    
+
     $lgtseek->time_check;
     print_complete( \%options );
 }
@@ -374,7 +368,7 @@ sub print_tab {
 
 sub help {
     die "Help: This script will identify bacterial human LGT.
-    --input=            <Input> Accepts bams, fastq, and fastq.gz. With fatsq's only use 1 of the pair for input. (ie: foo_1.fastq.gz)
+    --input=                <Input> Accepts bams, fastq, and fastq.gz. With fatsq's only use 1 of the pair for input. (ie: foo_1.fastq.gz)
     --output_dir=           Directory for all output. Will be created if it doesn't exist. 
     --help_full             Full help info on options.
     --workflow_help         Help setting up an efficient lgtseq workflow with the optional steps.\n";
@@ -388,9 +382,9 @@ sub help_full {
     --input_list|I=         <List of inputs> 1 per line.
          ______
     ____/Output\\________________________________________________________________________________
-    --output_dir|o=         Directory for all output. Will be created if it doesn't exist. 
-    --subdirs=              <0|1> [0] 1= Make a sub-directory in output_dir based on input name
-    --tcga_dirs=            <0|1> [0] 1= Make the sub-dir prefix = input's last folder in path (Maintain TCGA analysis_id directory structure)
+    --output_dir|o=         Directory for all output. Example: /path/to/{output_dir}/{tcga_dirs}/{subdirs}/ || /path/to/{output_dir}/{subdirs}/
+     --tcga_dirs=           <0|1> [0] 1= Make the sub-dir prefix the input's last folder in path (Maintain TCGA analysis_id directory structure)
+      --subdirs=            <0|1> [0] 1= Make the sub-dir prefix in output_dir based on input name.
          _______________________
     ____/Primary Human Alignment\\_______________________________________________________________
     --aln1_human=           <0|1> [0] 1= Primary aln to hg19. MUST be used if input=fastq's
@@ -399,7 +393,7 @@ sub help_full {
     --prelim_filter=        <0|1> [0] 1= Filter a human mapped bam, keeping potential LGT & Microbiome reads.
     --name_sort_input=      <0|1> [0] 1= Resort the input bam by read names.
     --keep_softclip=        <0|1> [1] 1= Keep soft clipped reads >=24 bp (Reads potentially on LGT)
-    --sort_mem=             [5G] Mem per thread to sort with. Careful this corresponds with --threads. 
+    --sort_mem=             [1G] Mem per thread to sort with. Careful this corresponds with --threads. 
          _________________________
     ____/Secondary Human Alignment\\______________________________________________________________
     --aln2_human=           <0|1> [0] 1= Secondary aln to hg19. Useful for mapping to standarized hg19 after prelim_filter.
@@ -407,8 +401,9 @@ sub help_full {
     ____/Submit to SGE-grid\\_____________________________________________________________________
     --Qsub|Q=               <0|1> [0] 1= qsub the job to the grid.
     --threads=|t            [1] # of CPU's to use for multithreading BWA sampe
-    --sub_mem|mf=           [6G] Min mem to qsub for on grid
+    --sub_mem|mf=           [5G] Min mem to qsub for on grid
     --sub_name=             [lgtseq] 
+    --sub_mail=             [0] 1= email user\@som.umaryland.edu when job is complete & with stats. Can also specify --sub_mail=specific\@email.foo
     --project=              Grid project to use. 
     --print_hostname|ph=    <0|1> [0] Print hostname. Defaults to 1 if verbose=1.
          ________________
@@ -435,7 +430,7 @@ sub workflow_help {
 
 ## This section isn't complete yet && not check to make sure these param's ARE in the .conf file
 sub conf_help {
-    die "The .lgtseek.conf file must have the following parameters. (There are probably others params to add to this list)
+    die "The .lgtseek.conf file must have the following parameters. This list is NOT an exhaustive list of mandatory options (yet).
              __________
         ____/References\\_____________________________________________________________________________
         --hg19_ref=         Path to hg19 reference

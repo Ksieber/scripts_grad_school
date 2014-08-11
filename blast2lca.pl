@@ -1,4 +1,5 @@
 #!/usr/bin/perl -I /home/ksieber/perl5/lib/perl5/ -I /home/ksieber/scripts/
+
 =head1 NAME
 
 blast2lca.pl
@@ -20,33 +21,36 @@ The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with "_"
 
 =cut
+
 use warnings;
 use strict;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
-my $results = GetOptions (\%options,
-		'input|i=s', # Comma separated list of files
-		'input_list|I=s',
-		'evalue_cutoff|e=s',
-		'best_hits_only=i',
-		'combine_PE_lca=i',
-		'Qsub|Q=i',
-		'sub_name=s',
-		'print_hostname|ph=i',
-		'output_dir|o=s',
-		'output_prefix=s',
-		'subdirs=i',
-		'taxon_host=s',
-		'taxon_dir=s',
-		'taxon_idx_dir=s',
-		'conf_file=s',
-		'verbose=i',
-		'help|h',
-		) or die "Error: Unrecognized command line option. Please try again.\n";
+my $results = GetOptions(
+    \%options,
+    'input|i=s',    # Comma separated list of files
+    'input_list|I=s',
+    'evalue_cutoff|e=s',
+    'best_hits_only=i',
+    'combine_PE_lca=i',
+    'Qsub|Q=i',
+    'sub_name=s',
+    'sub_mail=s',
+    'print_hostname|ph=i',
+    'output_dir|o=s',
+    'output_prefix=s',
+    'subdirs=i',
+    'taxon_host=s',
+    'taxon_dir=s',
+    'taxon_idx_dir=s',
+    'conf_file=s',
+    'verbose=i',
+    'help|h',
+) or die "Error: Unrecognized command line option. Please try again.\n";
 
-use lib ("/local/projects-t3/HLGT/scripts/lgtseek/lib/","/local/projects/ergatis/package-driley/lib/perl5/x86_64-linux-thread-multi/");
+use lib ( "/local/projects-t3/HLGT/scripts/lgtseek/lib/", "/local/projects/ergatis/package-driley/lib/perl5/x86_64-linux-thread-multi/" );
 use print_call;
-print_hostname(\%options);						## This is useful for trouble shooting grid nodes that might be missing modules for LGTSeek etc. 
+print_hostname( \%options );    ## This is useful for trouble shooting grid nodes that might be missing modules for LGTSeek etc.
 
 use LGTSeek;
 use run_cmd;
@@ -55,48 +59,50 @@ use Carp;
 $Carp::MaxArgLen = 0;
 use File::Basename;
 
-if($options{help}){&help;}		## @ end of script
-if(!$options{input} && !$options{input_list}){confess "Error: Please give an input.bam with --input=<FILE> or --input_list=<LIST>. Try again or use --help_full.\n";}
+if ( $options{help} ) { &help; }    ## @ end of script
+if ( !$options{input} && !$options{input_list} ) { confess "Error: Please give an input.bam with --input=<FILE> or --input_list=<LIST>. Try again or use --help_full.\n"; }
 
 ## Print the script call
-print_call(\%options);
+print_call( \%options );
 ## Initialize LGTSeek.pm
-my $lgtseek = LGTSeek->new2(\%options);
+my $lgtseek = LGTSeek->new2( \%options );
 ## Setup array ref of inputs
-my $inputs = setup_input(\%options);
+my $inputs = setup_input( \%options );
+
 # Setup a few default values
-my $evalue_cutoff = $options{evalue_cutoff} ? $options{evalue_cutoff} : "1";
-my $bho = $options{best_hits_only} ? $options{best_hits_only} : "0";
-my $combine_PE_lca= $options{combine_PE_lca} ? $options{combine_PE_lca} : "0";
+my $evalue_cutoff  = $options{evalue_cutoff}  ? $options{evalue_cutoff}  : "1";
+my $bho            = $options{best_hits_only} ? $options{best_hits_only} : "0";
+my $combine_PE_lca = $options{combine_PE_lca} ? $options{combine_PE_lca} : "0";
 
 # Calculate LCA's
-foreach my $input (@$inputs){
-	my ($name,$path,$suf) = fileparse($input,$lgtseek->{suffix_regex});
-	chomp $name;
+foreach my $input (@$inputs) {
+    my ( $name, $path, $suf ) = fileparse( $input, $lgtseek->{suffix_regex} );
+    chomp $name;
 
-	## Setup output directory
-	if(!$lgtseek->{output_dir}){$lgtseek->{output_dir}="$path/lgtseq/";}
-	if($lgtseek->{subdirs}){
-		$lgtseek->_run_cmd("mkdir -p $lgtseek->{output_dir}"); 
-		$lgtseek->{output_dir} = "$options{output_dir}/"."$name/"; 
-		$lgtseek->_run_cmd("mkdir -p $lgtseek->{output_dir}");
-	}
+    ## Setup output directory
+    if ( !$lgtseek->{output_dir} ) { $lgtseek->{output_dir} = "$path/lgtseq/"; }
+    if ( $lgtseek->{subdirs} ) {
+        $lgtseek->_run_cmd("mkdir -p $lgtseek->{output_dir}");
+        $lgtseek->{output_dir} = "$options{output_dir}/" . "$name/";
+        $lgtseek->_run_cmd("mkdir -p $lgtseek->{output_dir}");
+    }
 
-	my $lca = $lgtseek->blast2lca({
-		blast => $input,
-		output_dir => $lgtseek->{output_dir},
-		output_prefix => $options{output_prefix},
-		evalue_cutoff => $evalue_cutoff,
-		best_hits_only => $bho,
-		combine_PE_lca => $combine_PE_lca,
-		verbose => $lgtseek->{verbose},
-	});
+    my $lca = $lgtseek->blast2lca(
+        {   blast          => $input,
+            output_dir     => $lgtseek->{output_dir},
+            output_prefix  => $options{output_prefix},
+            evalue_cutoff  => $evalue_cutoff,
+            best_hits_only => $bho,
+            combine_PE_lca => $combine_PE_lca,
+            verbose        => $lgtseek->{verbose},
+        }
+    );
 }
 
-print_complete(\%options);
+print_complete( \%options );
 
 sub help {
-	die "Help: This script will take a blast-m8 report and calculate the LCA for each unique ID.
+    die "Help: This script will take a blast-m8 report and calculate the LCA for each unique ID.
 	----------------------------------------------------------------------------------------------------
 		--input|i=			<Input> Accepts blast -m8 reports.
 		--input_list=			List of blast -m8 reports, 1 file per line.
@@ -112,6 +118,7 @@ sub help {
 		--Qsub|Q=			<0|1> [0] 1 = Submit the job to the grid.
 		  --sub_name=  			Name of the job to submit.
 		  --project=			[jdhotopp-lab] Grid project to use.
+		  --sub_mail=           [0] 1= email user\@som.umaryland.edu when job is complete & with stats. Can also specify --sub_mail=specific\@email.foo
 	----------------------------------------------------------------------------------------------------	
 		--conf_file=			[/home/USER/.lgtseek.conf]
 		--taxon_host=			[mongotest1-lx.igs.umaryland.edu:10001]
@@ -123,19 +130,4 @@ sub help {
 		--help
 	----------------------------------------------------------------------------------------------------\n";
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

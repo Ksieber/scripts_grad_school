@@ -43,7 +43,7 @@ my $results = GetOptions (\%options,
 		) or die "Error: Unrecognized command line option. Please try again.\n";
 
 use run_cmd;
-if($options{Qsub}){ &Qsub3(\%options) };
+if($options{Qsub}){ &Qsub_script(\%options) };
 use print_call;
 print_hostname(\%options);									## This is useful for trouble shooting grid nodes that might be missing modules for LGTSeek etc. 
 

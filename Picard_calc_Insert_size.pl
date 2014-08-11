@@ -37,8 +37,8 @@ foreach my $file (@$input) {
     my $cmd2
         = "java -Xmx3g -jar /home/jdhotopp/bin/Picard/picard-tools-1.48/CollectInsertSizeMetrics.jar AS=true I=$file H=$out\.lrg_insert.histogram O=$out\.lrg_insert.metrics M=0 VALIDATION_STRINGENCY=SILENT DEVIATIONS=1000000000000000000";
     if ( $qsub == 1 ) {
-        Qsub2({cmd=>$cmd1, sub_name=> "CalcStdIsize"});
-        Qsub2({cmd=>$cmd2, sub_name=> "CalcLrgIsize"});
+        Qsub({cmd=>$cmd1, sub_name=> "CalcStdIsize"});
+        Qsub({cmd=>$cmd2, sub_name=> "CalcLrgIsize"});
     }
     else {
         run_cmd($cmd1);

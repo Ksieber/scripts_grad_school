@@ -35,8 +35,10 @@ if($options{LGT_file}){
 	   my ($lgt_read,$lgt_bacteria)=split(/\t/, $_);
 	   if ($lgt_read =~ m/^(\w+?)\./) {
 	      $lgt_subject = $1;
+      } else {
+          $lgt_subject = $lgt_read;
       }
-  	   $lgt_info{$lgt_subject}->{$lgt_bacteria}++;
+  	  $lgt_info{$lgt_subject}->{$lgt_bacteria}++;
     }
     close LGT || die "ERROR: Couldn't close $options{LGT_file} because: $!\n";
 }
@@ -54,6 +56,8 @@ while (<MPD>){
         my ($mpd_read,$mpd_bacteria)=split(/\t/, $_);
         if ($mpd_read =~ m/^(\w+?)\./){
             $mpd_subject = $1;
+        } else {
+            $mpd_subject = $mpd_read;
         }
         $mpd_info{$mpd_subject}->{$mpd_bacteria}++;
     }

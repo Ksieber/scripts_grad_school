@@ -53,7 +53,7 @@ if ( !$options{fasta} && !$options{bam} ) { confess "Error: Please give an input
 print_call( \%options );
 if ( $options{Qsub} ) {
     if ( !$options{sub_name} ) { $options{sub_name} = "blastn"; }
-    Qsub3( \%options );
+    Qsub_script( \%options );
 }
 
 ## Initialize LGTSeek.pm
