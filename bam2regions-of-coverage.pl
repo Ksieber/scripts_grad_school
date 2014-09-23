@@ -34,7 +34,7 @@ use setup_input;
 use File::Basename;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
-my $results = GetOptions( \%options, 'input=s', 'mpileup=s', 'min_cov=i', 'make_bams=i', 'pos_sort=i', 'threads=i', 'sort_mem=s', 'ref=s', 'output_dir=s', 'output_prefix=s', 'subdirs=i', 'help' )
+my $results = GetOptions( \%options, 'input|i=s', 'mpileup=s', 'min_cov|c=i', 'make_bams=i', 'pos_sort|S=i', 'threads|t=i', 'sort_mem=s', 'ref|r=s', 'output_dir|o=s', 'output_prefix|p=s', 'subdirs=i', 'help|?' )
     or die "Unrecognized command line option. Please try agian.\n";
 
 ## Check if the user needs help information
@@ -53,12 +53,13 @@ my $p_sort        = defined $options{pos_sort}      ? $options{pos_sort}      : 
 my $ref           = defined $options{ref}           ? "-f $options{ref} "     : undef;
 my $min_cov       = defined $options{min_cov}       ? $options{min_cov}       : "2";
 
+########################
 if ( $p_sort == 1 ) {
     run_cmd("samtools sort -@ $lgtseek->{threads} -m $lgtseek->{sort_mem} $input $out\.pos-sort");
     run_cmd("samtools index $out\.pos-sort.bam $out\.pos-sort.bai");
     $input = "$out\.pos-sort.bam";
 }
-
+########################
 ## Open file to find unique regions
 my $infh;
 if ( $options{mpileup} ) {
@@ -67,8 +68,15 @@ if ( $options{mpileup} ) {
 else {
     open( $infh, "-|", "samtools mpileup $ref -A $input" ) || die "ERROR: Can't open: samtools mpileup $ref-A $input\n";
 }
-open( my $OFH, ">", "$out\_regions-of-coverage.txt" ) || die "ERROR: Can't open: $out\_regions-of-coverage.txt.\n";
-
+######################## 
+my $OFH;
+if ( $options{output_dir} || $options{output_prefix} ) {
+    open( $OFH, ">", "$out\_regions-of-coverage.txt" ) || die "ERROR: Can't open: $out\_regions-of-coverage.txt.\n";
+}
+else {
+    $OFH = *STDOUT;
+}
+########################
 undef my %start_position;
 undef my %previous_position;    ## $previous_position{$chr}=start position of region of coverage
 my $final_chr_check;
@@ -134,7 +142,9 @@ while (<$infh>) {
 
 close $infh;
 close $OFH;
-
+########################
+##### Subroutines ######
+########################
 sub print_region {
     for my $previous_chr ( keys %previous_position ) {
         my $mean_coverage = Math::NumberCruncher::Mean( \@coverage );
@@ -146,16 +156,20 @@ sub print_region {
 }
 
 sub help {
-    die "This script will take a bam file and make a text file with the unique regions of coverage.
+    die "    ------------------------------------------------------------
+    This script will take a bam file and make a text file with the unique regions of coverage.
+    OUTPUT goes to STDOUT if no --output_dir or --output_prefix.
+    ------------------------------------------------------------
         --input=            <BAM>
+        --pos_sort=         Sort the input bam.
         --mpileup=          <mpileup of BAM>.
         --min_cov=          Min. coverage cutoff for regions of interest.
-        --pos_sort=         Sort the input bam.
-        --make_bams=            Make bams for each region of coverage.
-        --output_dir=           Directory for output.
+        --make_bams=        Make bams for each region of coverage.
+        --output_dir=       Directory for output.
          --output_prefix=
          --subdirs=
-        --help\n";
+        --help
+    ------------------------------------------------------------\n";
 }
 
 __END__

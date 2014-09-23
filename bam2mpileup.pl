@@ -16,7 +16,7 @@ if ( $options{help} ) {
         --input_list=       List of bams to process.
         --sort=             <0|1> [0] 1= Sort input by position. In order to calc. mpileup input must be position sorted.
          --threads=          [1] # threads to use for sorting.
-         --sort_mem=         [5G] Amount of RAM to use for sorting.  
+         --sort_mem=         [1G] Amount of RAM to use for sorting.  
         --ref=              Reference fasta + index. 
         --output_dir=       Name the directory for output.  
          --output_prefix=    [filename] Prefix for the output file.
@@ -40,8 +40,8 @@ my $MU       = defined $options{MU}       ? $options{MU}         : "0";
 my $A        = defined $options{A}        ? $options{A}          : 1;
 my $d        = defined $options{d}        ? $options{d}          : 100000;
 my $region   = defined $options{region}   ? "'$options{region}'" : undef;
-my $threads  = defined $options{threads}  ? "$options{threads}"  : 1;
-my $sort_mem = defined $options{sort_mem} ? "$options{sort_mem}" : "5G";
+my $threads  = defined $options{threads}  ? "$options{threads}"  : 4;
+my $sort_mem = defined $options{sort_mem} ? "$options{sort_mem}" : "1G";
 my $ref      = defined $options{ref}      ? "$options{ref}"      : undef;
 my $view    = "-hu";       ## Default
 my $mpileup = "-Ad $d";    ## Default
@@ -61,12 +61,12 @@ foreach my $bam (@$input) {
     my $prefix = $options{output_prefix} ? $options{output_prefix} : $filename;
     my $dir    = $options{output_dir}    ? $options{output_dir}    : $directory;
     if ( $dir =~ /\w+/ ) { run_cmd("mkdir -p -m u=rwx,g=rwx,o= $dir"); }
-    my $out = "$dir/$prefix";
+    my $out = ( $dir =~ /w+/ ) ? "$dir$prefix" : $prefix;
     my $cmd;
-    if ( $sort == 1 ) {
-        $cmd = "samtools sort -@ $threads -m $sort_mem -o $bam - | samtools view $view - $region | samtools mpileup $mpileup - > $out\.mpileup";
-    }
-    else { $cmd = "samtools view $view $bam $region | samtools mpileup $mpileup - > $out\.mpileup"; }
+    if ( $sort == 1 && defined $options{region} ) { $cmd = "samtools sort -@ $threads -m $sort_mem -o $bam - | samtools view $view - $region | samtools mpileup $mpileup - > $out\.mpileup"; }
+    elsif ( $sort == 1 && !$options{region} ) { $cmd = "samtools sort -@ $threads -m $sort_mem -o $bam - | samtools mpileup $mpileup - > $out\.mpileup"; }
+    elsif ( defined $options{region} || $options{MM} == 1 || $options{MU} == 1 ) { $cmd = "samtools view $view $bam $region | samtools mpileup $mpileup - > $out\.mpileup"; }
+    else                                                                         { $cmd = "samtools mpileup $mpileup $bam > $out\.mpileup"; }
 
     if ( $qsub == 1 ) { Qsub( { cmd => $cmd, threads => $threads, sub_mem => $sort_mem, wd => $dir, sub_name => "mpileup" } ); next; }
     else              { run_cmd($cmd); }

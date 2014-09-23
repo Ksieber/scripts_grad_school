@@ -15,7 +15,7 @@ my $results = GetOptions (\%options,
 		'output_prefix=s',
 		'output_suffix=s',
 		'output_name=s',
-		'help',
+		'help|?',
 		);
 
 if($options{help}){die "Help: This script will parse out the good or bad lines(ids etc) from --input_list.
@@ -27,7 +27,7 @@ if($options{help}){die "Help: This script will parse out the good or bad lines(i
 		--output_suffix=
 		--output_name=
 		# If no --output given, output => *STDOUT
-		--help.\n"
+		--help|?.\n"
 		};
 
 my $lgtseek = LGTSeek->new2(\%options);

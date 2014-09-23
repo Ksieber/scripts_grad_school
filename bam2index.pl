@@ -14,7 +14,7 @@ my $results = GetOptions (\%options,
       'output_dir=s',
       'Qsub=s',
       'sort_mem=s',
-      'help',
+      'help|?',
 );
 
 if($options{help}){
@@ -23,7 +23,7 @@ if($options{help}){
       --output_prefix=  	\$Prefix.bai
       --output_dir=     	/Directory/to/put/output
       --Qsub=			<0|1> [0] 1= Qsub to grid.
-      --help\n";
+      --help|?\n";
 }
 
 if(!$options{input} && !$ARGV[0]){ die "Must pass an input bam to sort, use --input=<BAM> or pass \$ARGV[0]\n"; }

@@ -11,7 +11,7 @@ my $results = GetOptions (\%options,
                           'good_list=s',                        
                           'output_dir=s',
                           'output_prefix=s',
-             			  'help|h',
+             			  'help|?',
 );
 
 if($options{help}){die "HELP: This script will take a bam and report the chromosome, cordinates and orientation of each mapped read. 
@@ -20,6 +20,7 @@ if($options{help}){die "HELP: This script will take a bam and report the chromos
 	--output_dir=s		Directory for output. [input dir]
 	--output_prefix=s	Prefix for the output file. [input bam]
 	--bin_dir=s		Directory with LGTSeek.pm [/local/projects-t3/HLGT/scripts/lgtseek-master/lib/]
+	--help|?
 	\n";
 }
 

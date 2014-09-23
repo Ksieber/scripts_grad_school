@@ -10,7 +10,7 @@ our %options;
 our $results = GetOptions(
     \%options,     'input|i=s',    'input_list=s', 'output_prefix=s',     'output_dir|o=s', 'subdirs=s',    'ref|r=s',          'ref_list=s',
     'threads|t=s', 'disable_SW=s', 'bam_output=s', 'sort_index_output=s', 'mpileup=s',      'no_cleanup=s', 'insert_metrics=s', 'mapped_only=s',
-    'cmd_log=s',   'Qsub|Q=i',     'name=s',       'project=s',           'sub_mem=s',      'help|h',       'help_full',        'name_sort_input=i',
+    'cmd_log=s',   'Qsub|Q=i',     'name=s',       'project=s',           'sub_mem=s',      'help|h',       'help_full|?',        'name_sort_input=i',
     'sort_mem=s',  'sub_mail=s',
 ) or die "Error: Unrecognized command line option. Please try again.\n";
 
@@ -224,9 +224,9 @@ sub help {
     die "\nHELP: This script will BWA align the input to a reference.
         --input=            Input file to be BWA mapped. Either: in.bam or in_1.fq,in_2.fq
         --ref=              Reference.fna+index
-        --output_dir=           Will output to current working directory unless another is specified with this. ie. /ksieber_dir/tmp/
+        --output_dir=       Will output to current working directory unless another is specified with this. ie. /ksieber_dir/tmp/
         --help              Basic Help Info
-        --help_full             Full Help Info\n";
+        --help_full         Full Help Info\n";
 }
 
 sub help_full {

@@ -46,7 +46,7 @@ my $results = GetOptions (\%options,
 	'output_dir=s',
 	'subdirs=i',
 	'verbose=i',
-	'help|h',
+	'help|?',
 	);
 
 if($options{help}){
@@ -59,7 +59,8 @@ if($options{help}){
 		--Qsub=
 		  --excl=
 		  --sub_mem=
-		  --threads=\n";
+		  --threads=
+		-help|?\n";
 }
 
 my $lgtseek = LGTSeek->new2(\%options);

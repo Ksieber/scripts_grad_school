@@ -12,10 +12,10 @@ use Data::Dumper;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
 my $results = GetOptions(
-    \%options,         'input|i=s',       'sort|s=i',       'window_size|w=i', 'step_size|p=i', 'min_cov|c=i',
-    'min_quality|q=i', 'output_prefix=s', 'output_dir|o=s', 'tdo=i',           'Qsub|Q=i',      'region=s',
-    'A=i',             'd=i',             'M_M=i',          'M_UM=i',          'help|h',
-);
+    \%options,         'input|i=s',         'sort|S=i',       'window_size|w=i', 'step_size|s=i', 'min_cov|c=i',
+    'min_quality|q=i', 'output_prefix|p=s', 'output_dir|o=s', 'tdo=i',           'Qsub|Q=i',      'region|r=s',
+    'A=i',             'd=i',               'M_M=i',          'M_UM=i',          'help|?',
+) or die "Unrecognized command line option. Please try agian.\n";
 
 if ( $options{help} )        { help(); }
 if ( !$options{input} )      { die "ERROR: Must give an input file with: --input= BAM or mpileup file." }
@@ -25,7 +25,7 @@ if ( !$options{window_size} || !$options{step_size} ) { die "ERROR: Must pass th
 my $lgtseq = LGTSeek->new2( \%options );
 our $window_size = defined $options{window_size} ? $options{window_size}   : "10";
 our $step_size   = defined $options{step_size}   ? $options{step_size} - 1 : "5";
-our $min_cov     = defined $options{min_cov}     ? "$options{min_cov}"     : "0";
+our $min_cov     = defined $options{min_cov}     ? "$options{min_cov}"     : "1";
 our $tdo         = defined $options{tdo}         ? "$options{tdo}"         : "0";
 
 my $sort = defined $options{sort} ? "$options{sort}" : "0";
@@ -38,7 +38,7 @@ my $view    = "$quality -hu";                              ## Default
 my $A       = defined $options{A} ? "$options{A}" : "1";
 my $mpileup = ( $A == 0 ) ? "-d $d" : "-Ad $d";            ## Default
 
-my $window;    # keys: coverage (total coverage seen in window), start (actual start), stop (expected stop), bases (total in window seen), chr
+my $window;                                                # keys: coverage (total coverage seen in window), start (actual start), stop (expected stop), bases (total in window seen), chr
 my $next_window;
 my $fh = open_input( $options{input} );
 
@@ -89,8 +89,7 @@ sub open_input {
     my $fh;
     ## Mpileup input
     map {
-        if ( $suffix eq $_ )
-        {
+        if ( $suffix eq $_ ) {
             ## Warn we can't filter quality with mpileup input.
             if ( defined $options{min_quality} ) {
                 print STDERR
@@ -105,8 +104,8 @@ sub open_input {
     ## Position sorted bam
     my @psort_bams = ( '_pos-sort.bam', '_psort.bam', 'srt.bam' );
     map {
-        if ( $suffix eq $_ )
-        {
+        if ( $suffix eq $_ ) {
+            print STDERR "FOOBAR\n";
             open( $fh, "-|", "samtools view $view $raw_input $region | samtools mpileup $mpileup - " )
                 || confess "ERROR: Can't open input: $raw_input because: $!\n";
             return $fh;
@@ -115,10 +114,9 @@ sub open_input {
 
     ## Name sorted bam || --sort=1
     map {
-        if ( $suffix eq $_ || $sort == 1 )
-        {
+        if ( $suffix eq $_ || $sort == 1 ) {
             print STDERR "Sorting input bam . . .\n";
-            open( $fh, "-|", "samtools sort -m 5G -o $raw_input - | samtools view $view - $region | samtools mpileup $mpileup - " )
+            open( $fh, "-|", "samtools sort -m 1G -o $raw_input - | samtools view $view - $region | samtools mpileup $mpileup - " )
                 || confess "ERROR: Can't open input: $raw_input because: $!\n";
             return $fh;
         }
@@ -148,16 +146,16 @@ sub init_window {
 
 sub help {
     die "Help: This script will calculate coverage with a sliding window. 
-	--input|i=	    	Mpileup or bam.
-        --sort|s=           	<0|1> [0] 1= Position sort input bam.
-        --window_size|w=    	Size of the window to calculate coverage for. 
-        --step_size|p=     	Size of the steps inbetween windows.
-        --min_cov|m=        	Minimal coverage to report.
-        --min_quality|q=	[0] Minimal quality score for mapping.
-        --output_prefix=    	Prefix for the output.
-        --output_dir|o=     	Directory for output.
-        --tdo=			<0|1> [0] 1= Tab Delimited Output of chr and position. 0= IGV style.
-        --Qsub|Q=           	<0|1> [0] 1= Qsub job to grid.
-	--help|h\n";
+    --input|i=             Mpileup or bam.
+        --sort|S=          <0|1> [0] 1= Position sort input bam.
+        --window_size|w=   Size of the window to calculate coverage for. 
+        --step_size|s=     Size of the steps inbetween windows.
+        --min_cov|c=       Minimal coverage to report.
+        --min_quality|q=   [0] Minimal quality score for mapping.
+        --output_prefix=   Prefix for the output.
+        --output_dir|o=    Directory for output.
+        --tdo=             <0|1> [0] 1= Tab Delimited Output of chr and position. 0= IGV style.
+        --Qsub|Q=          <0|1> [0] 1= Qsub job to grid.
+    --help|?\n";
 }
 

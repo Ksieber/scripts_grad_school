@@ -8,7 +8,7 @@ use run_cmd;
 use POSIX;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
-my $results = GetOptions( \%options, 'input=s', 'threads=s', 'output_prefix=s', 'output_dir=s', 'Qsub=s', 'sort_mem=s', 'sub_mem=s', 'sub_mail=s', 'help', )
+my $results = GetOptions( \%options, 'input=s', 'threads=s', 'output_prefix=s', 'output_dir=s', 'Qsub=s', 'sort_mem=s', 'sub_mem=s', 'sub_mail=s', 'help|?', )
     or die "Error: Unrecognized command line option. Please try again.\n";
 
 if ( $options{help} ) {
@@ -21,7 +21,7 @@ if ( $options{help} ) {
         --sub_mem=       [5G] Needs to reflect changes in --sort_mem (sort_mem * threads + overhead).
         --threads=       [1] # of threads to use for sorting. 
         --sub_mail=      [0] 1= email user\@som.umaryland.edu when job is complete + with stats. Can also specify --sub_mail=specific\@email.foo
-      --help\n";
+      --help|?\n";
 }
 
 if ( !$options{input} && !$ARGV[0] ) { die "Must pass an input bam to sort, use --input=<BAM> or pass \$ARGV[0]\n"; }

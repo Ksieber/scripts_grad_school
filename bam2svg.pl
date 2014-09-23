@@ -19,7 +19,7 @@ use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
 my $results = GetOptions(
     \%options,           'input|i=s',      'region=s', 'sort|s=i',       'scale=i',       'image_length=i', 'image_width=i',   'pad_scale=i',
-    'output_prefix|p=s', 'output_dir|o=s', 'stdout=i', 'draw_stdev|d=i', 'picard_file=s', 'stdev|D=i',      'insert_size|I=i', 'help',
+    'output_prefix|p=s', 'output_dir|o=s', 'stdout=i', 'draw_stdev|d=i', 'picard_file=s', 'stdev|D=i',      'insert_size|I=i', 'help|?',
 ) or die "Error: Unrecognized command line option. Please try again.\n";
 if ( $options{help} ) { &help; }
 
@@ -217,6 +217,7 @@ sub help {
 		--output_prefix=		[filename] Prefix for the output file. Optional.
 		--output_dir=			[input_dir] Directory to put the output. Optional.
 		----------------------------------------------------------------------------------------
+		--help|?
 ";
 }
 

@@ -33,7 +33,7 @@ my $results = GetOptions(
     \%options,         'input_list|I=s',  'input|i=s',       'name_sort_input=s', 'sort_mem=s',          'split_bam=i',   'encrypt=i',     'key=s',
     'prelim_filter=i', 'seqs_per_file=i', 'keep_softclip=i', 'Qsub|Q=i',          'excl=i',              'sub_mem=s',     'sub_name=s',    'threads|t=i',
     'projects=s',      'output_dir|o=s',  'subdirs=i',       'overwrite=s',       'samtools_bin=s',      'ergatis_dir=s', 'output_list=s', 'bin_dir=s',
-    'fs=s',            'clovr=s',         'diag',            'verbose=i',         'print_hostname|ph=i', 'config_file=s', 'help|h',        'help_full',
+    'fs=s',            'clovr=s',         'diag',            'verbose=i',         'print_hostname|ph=i', 'config_file=s', 'help|h',        'help_full|?',
     'tcga_dirs=i',     'aln_human=i',     'hg19_ref=s',      'no_gal=i',          'hostname=s',          'sub_mail=s',
 ) or die "Error: Unrecognized command line option. Please try again.\n";
 use print_call;
@@ -53,7 +53,7 @@ if ( $options{help} ) {
         --input=            <BAM>
         --name_sort_input=  <0|1> [0] 1= Resort the input bam by read names.  
         --output_dir=       Directory for output. 
-        --help_full         Full Help Info\n";
+        --help_full|?       Full Help Info\n";
 }
 
 if ( $options{help_full} ) {
@@ -67,9 +67,9 @@ if ( $options{help_full} ) {
         --paired_end=       <0|1> [1] 1= Paired End Sequencing reads.
         --prelim_filter=    <0|1> [1] 1= Filter out M_M reads, keeping MU,UU,and SC. 
           --keep_softclip=  <0|1> [1] 1= Keep soft clipped reads >=24 bp (Reads potentially on LGT) 
-        --name_sort_input=  <0|1> [0] 1= Resort the input bam by read names.  
+        --name_sort_input=  <0|1> [0] 1= Resort the input bam by read names.
           --sort_mem=       [1G] Mem per thread to sort with. 
-          --threads=        [1] # of threads 
+          --threads=        [1] # of threads. 
         --split_bam=        <0|1> [1] 1= Split bam(s)
           --seqs_per_file=  <lines per bam> [50,000,000]
         --encrypt=          <0|1> [0] 1= encrypt ** untested **
@@ -91,8 +91,8 @@ if ( $options{help_full} ) {
         --bin_dir=          [/local/projects-t3/HLGT/scripts/lgtseek/bin/] Directory where LGTSeek.pm is stored.
         ----------------------------------------------------------------------------------------
         --verbose           <0|1> [0] 1= Verbose reporting of progress. 0 =Turns off reports. 
-        --help              Basic Help Info
-        --help_full         Full Help Info
+        --help|h            Basic Help Info
+        --help_full|?       Full Help Info
         --conf_file=        [~/.lgtseek.conf]
         ----------------------------------------------------------------------------------------\n";
 }
@@ -100,9 +100,9 @@ if ( $options{help_full} ) {
 if ( !$options{input} && !$options{input_list} ) { confess "Error: Must give input with --input=<BAM> or --input_list=<LIST of bams>\n"; }
 
 ## Set default values
-$options{prelim_filter} = defined $options{prelim_filter} ? "$options{prelim_filter}" : "1";
-$options{sub_mem}       = defined $options{sub_mem}       ? "$options{sub_mem}"       : "5G";
-$options{output_list}   = defined $options{output_list}   ? "$options{output_list}"   : "1";
+$options{prelim_filter}   = defined $options{prelim_filter}   ? "$options{prelim_filter}"   : "1";
+$options{sub_mem}         = defined $options{sub_mem}         ? "$options{sub_mem}"         : "5G";
+$options{output_list}     = defined $options{output_list}     ? "$options{output_list}"     : "1";
 
 my $lgtseek = LGTSeek->new2( \%options );
 
@@ -128,16 +128,14 @@ foreach my $input (@$input) {
         ## If we are in the orignal call, change input from list to a single file
         if ( $options{input_list} ) { $options{input} = $input; }
         ## Check $sub_mem is enough for sorting
-        my $original_sub_mem;
-        my $original_sort_mem;
-        if ( $options{sub_mem} ) {
-            if ( $options{sub_mem} =~ /^(\d+)[K|M|G]$/ ) { $original_sub_mem = $1; }
-        }
-        if ( $options{sort_mem} ) {
-            if ( $options{sort_mem} =~ /^(\d+)[K|M|G]$/ ) { $original_sort_mem = $1; }
-        }
-        if ( $original_sub_mem < ( $original_sort_mem * $options{threads} ) ) {
-            $options{sub_mem} = ( ceil( ( $original_sort_mem * $options{threads} ) * 1.1 ) ) + 1 . "G";
+        if ( $lgtseek->{name_sort_input} == 1 ) {
+            my $original_sub_mem;
+            my $original_sort_mem;
+            if ( $lgtseek->{sub_mem} =~ /^(\d+)[K|M|G]$/ )  { $original_sub_mem  = $1; }
+            if ( $lgtseek->{sort_mem} =~ /^(\d+)[K|M|G]$/ ) { $original_sort_mem = $1; }
+            if ( $original_sub_mem < ( $original_sort_mem * $options{threads} ) ) {
+                $options{sub_mem} = ( ceil( ( $original_sort_mem * $options{threads} ) * 1.1 ) ) + 1 . "G";
+            }
         }
 
         ## Build qsub command
@@ -238,7 +236,6 @@ foreach my $input (@$input) {
 
     ## Print out the output list
     if ( $lgtseek->{output_list} == 1 ) {
-
         # Open a list file to write the output bams to
         open( my $olistfh, ">$lgtseek->{output_dir}/output.list" ) or confess "Unable to open: $lgtseek->{output_dir}/output.list because: $!\n";
         if ( $lgtseek->{encrypt} == 1 ) {

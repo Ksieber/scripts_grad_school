@@ -28,7 +28,7 @@ my $results = GetOptions(
     'titrate_n_string=i',  'M_only=i',         'MM_only=i',       'anchor_bam1=i',  'png=i',         'svg=i',          'draw_stdev|d=i',    'draw_both|B=i',
     'picard_file|P=s',     'stdev|D=i',        'insert_size|I=i', 'image_length=i', 'image_width=i', 'pad_scale=i',    'output_dir|o=s',    'output_prefix|p=s',
     'merged_ref_name=s',   'dedup=i',          'jsd=i',           'threads=i',      'Qsub=i',        'sub_mem=s',      'sub_name=s',        'number_of_reads=i',
-    'split_bam1_cov=i',    'split_bam2_cov=i', 'no_gal=i',        'alternative=s',  'help|h',        'min_cov=i',
+    'split_bam1_cov=i',    'split_bam2_cov=i', 'no_gal=i',        'alternative=s',  'help|?',        'min_cov=i',
 ) or die "Unrecognized command line option. Please try agian.\n";
 if ( $options{help} ) { &help; }    ## &help is @ the end of the script
 
@@ -1548,7 +1548,7 @@ sub help {
     --output_dir|o=         Directory for output.               [/options/bam1/dir/]
     --output_prefix|p=      Prefix for the output fasta & bam.  [bam1-merged-bam2]
     --stdout=               <0|1> [0] 1= Output goes to STDOUT. Either pipe it into a \"display\" ( | display - ) or redirect it to a new file ( > new.img)
-    --help|h
+    --help|?
     ------------------------------------------------------------------------------------------------------------------------------------------------------------
      ** More info  ** 
     --ref#_region = May also accept a file with 1 region / line. May also take comma delimited regions or multiple --ref_region entries. If no region given, defaults to bam region. 

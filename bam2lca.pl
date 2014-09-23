@@ -60,7 +60,7 @@ my $results = GetOptions (\%options,
 		'fs=s',
 		'verbose=s',
 		'help|h',
-		'help_full',
+		'help_full|?',
 		'workflow_help'
 		);
 

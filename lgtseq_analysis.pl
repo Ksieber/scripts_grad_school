@@ -32,7 +32,7 @@ my $results = GetOptions(
     'aln1_human=i',   'aln2_human=i',        'split_bac_list=s', 'hg19_ref=s',      'refseq_list=s',     'output_dir|o=s',    'subdirs=i',        'tcga_dirs=i',
     'lgt_coverage=i', 'max_overlap=i',       'min_length=i',     'bin_dir=s',       'samtools_bin=s',    'ergatis_bin=s',     'prinseq_bin=s',    'donor_lineage=s',
     'host_lineage=s', 'threads|t=i',         'taxon_host=s',     'taxon_dir=s',     'taxon_idx_dir=s',   'path_to_blastdb=s', 'best_hits_only=i', 'evalue_cutoff=s',
-    'verbose|V=i',    'print_hostname|ph=i', 'conf_file=s',      'help|h',          'help_full|H',       'workflow_help',     'conf_help',        'sub_mail=s',
+    'verbose|V=i',    'print_hostname|ph=i', 'conf_file=s',      'help|h',          'help_full|?',       'workflow_help',     'conf_help',        'sub_mail=s',
 ) or die "Error: Unrecognized command line option. Please try again.\n";
 
 ## Check if the user needs help information
@@ -210,7 +210,7 @@ foreach my $input (@$inputs) {
     ## Check to make sure we found LGT.
     print STDERR "======== LGT ========\n";
     if ( $lgtseek->empty_chk( { input => $pp_data->{files}->{lgt_donor} } ) ) {
-        print STDERR "No LGT in: $pp_data->{files}->{lgt_donor}\. Skipping LGT LCA calculation and blast validation.\n";
+        print STDERR "***Warning*** No LGT in: $pp_data->{files}->{lgt_donor}\. Skipping LGT LCA calculation and blast validation.\n";
     }
     else {
         # Prinseq filter the putative lgts
@@ -299,7 +299,7 @@ foreach my $input (@$inputs) {
     print STDERR "====== Microbiome ======\n";
     ## Check to make sure we found Microbiome Reads. If no microbiome reads skip this step.
     if ( $lgtseek->empty_chk( { input => "$lgtseek->{output_dir}\/$name\_microbiome.bam" } ) ) {
-        print STDERR "No Microbiome reads in: $lgtseek->{output_dir}\/$name\_microbiome.bam. Skipping microbiome LCA calculation.\n";
+        print STDERR "***Warning*** No Microbiome reads in: $lgtseek->{output_dir}\/$name\_microbiome.bam. Skipping microbiome LCA calculation.\n";
     }
     else {
 
@@ -370,7 +370,7 @@ sub help {
     die "Help: This script will identify bacterial human LGT.
     --input=                <Input> Accepts bams, fastq, and fastq.gz. With fatsq's only use 1 of the pair for input. (ie: foo_1.fastq.gz)
     --output_dir=           Directory for all output. Will be created if it doesn't exist. 
-    --help_full             Full help info on options.
+    --help_full|?           Full help info on options.
     --workflow_help         Help setting up an efficient lgtseq workflow with the optional steps.\n";
 }
 
@@ -410,7 +410,7 @@ sub help_full {
     ____/Help Information\\_______________________________________________________________________
     --verbose|V             <0|1> [0] 1= Verbose reporting of progress. 0 =Turns off reports. 
     --help|h                Help Basic Info
-    --help_full|H           Help Full Info
+    --help_full|?           Help Full Info
     --workflow_help         Examples how to use optional portions of lgt_seq to increase efficiency.
     --conf_file=            [~/.lgtseek.conf]
     --conf_help             Help Information on lgtseek.conf requirements.
