@@ -7,19 +7,19 @@ use run_cmd;
 use POSIX;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
-my $results = GetOptions( \%options, 'input=s', 'input_list=s', 'output_prefix=s', 'output_dir=s', 'threads=i', 'sort_mem=s', 'sub_mem=s', 'Qsub=i', 'help', 'sub_mail=s', )
+my $results = GetOptions( \%options, 'input|i=s', 'input_list|I=s', 'output_prefix=s', 'output_dir|o=s', 'threads|t=i', 'sort_mem=s', 'sub_mem=s', 'Qsub|q=i', 'help|h', 'sub_mail=s', )
     or die "Error: Unrecognized command line option. Please try again.\n";
 
 if ( $options{help} ) {
     die "Help: This script will take a bam to sort based on names. 
-      --input=           <BAM> to name sort.
-      --input_list=      Either a file with a list 1 bam/line or comma seperated string of bams. 
+      --input|i=           <BAM> to name sort.
+      --input_list|I=      Either a file with a list 1 bam/line or comma seperated string of bams. 
+      --output_dir|o=      directory to put output
       --output_prefix=   prefix.bam
-      --output_dir=      directory to put output
       --sort_mem=        [1G] RAM / thread for sort. 
-      --Qsub=            <0|1> [0] 1= Qsub the sort. 
+      --Qsub|q=            <0|1> [0] 1= Qsub the sort. 
         --sub_mem=       [5G] Needs to reflect changes in --sort_mem (sort_mem * threads + overhead).
-        --threads=       [1] # of threads to use for sorting. 
+        --threads|t=       [1] # of threads to use for sorting. 
         --sub_mail=      [0] 1= email user\@som.umaryland.edu when job is complete + with stats. Can also specify --sub_mail=specific\@email.foo
       --help\n";
 }
@@ -46,7 +46,7 @@ if ( $options{Qsub} ) {
 
 my $input_list = setup_input( \%options );
 foreach my $input (@$input_list) {
-    my ( $bam, $path, $suf ) = fileparse( $input, ( ".srt.bam", ".sort.bam", "_psort\.bam", "_pos-sort\.bam", ".bam" ) );
+    my ( $bam, $path, $suf ) = fileparse( $input, ( '-psrt\.bam', '\-psort\.bam', '\_psort\.bam', '\_pos-sort\.bam', '\.srt\.bam', '\.sort\.bam', '\.bam' ) );
     my $prefix = $options{output_prefix} ? $options{output_prefix} : $bam;
     my $dir    = $options{output_dir}    ? $options{output_dir}    : $path;
     $dir =~ s/\/$//;

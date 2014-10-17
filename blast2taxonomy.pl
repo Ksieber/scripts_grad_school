@@ -27,7 +27,7 @@ my %options;
 my $results = GetOptions (\%options,
 		'input|i=s', # Comma separated list of files
 		'input_list|I=s',
-		'Qsub|Q=i',
+		'Qsub|q=i',
 		'sub_name=s',
 		'project=s',
 		'print_hostname|ph=i',
@@ -123,7 +123,7 @@ sub help {
 		  --output_prefix=		Name of prefix for the output. 
 		  --subdirs=			<0|1> [0] 1 = Create a new subdirectory for each input in the output directory.
 	----------------------------------------------------------------------------------------------------
-		--Qsub|Q=			<0|1> [0] 1 = Submit the job to the grid.
+		--Qsub|q=			<0|1> [0] 1 = Submit the job to the grid.
 		  --sub_name=  			[STDIN] Name of the job to submit.
 		  --project=			[jdhotopp-lab] Grid project to use. 
 	----------------------------------------------------------------------------------------------------	

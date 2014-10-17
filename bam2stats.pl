@@ -9,19 +9,20 @@ use setup_input;
 use lib '/local/projects-t3/HLGT/scripts/lgtseek/lib/';
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 our %options;
-our $results = GetOptions( \%options, 'input=s', 'input_list=s', 'output_dir=s', 'subdirs=s', 'append=s', 'Qsub=s', 'help|?' ) or die "Unrecognized command line option. Please try agian.\n";
+our $results = GetOptions( \%options, 'input|i=s', 'input_list|I=s', 'output_dir|o=s', 'subdirs=s', 'append=s', 'Qsub|q=s', 'help|?' ) or die "Unrecognized command line option. Please try agian.\n";
 
 if ( $options{help} ) {
     die "This script will calculate the number of reads in a bam: Total, MM, MU, UU, SC
-    --input=            <BAM>
-    --input_list=       <list of BAMS>
+    --input|i=            <BAM> (Also accepts single bam from \$ARGV[0])
+    --input_list|I=       <list of BAMS>
     --append=           </path/file/append.txt> Add output stats to this file.
-    --output_dir=       </path/for/output/>
+    --output_dir|o=       </path/for/output/>
     --subdirs=          <0|1> [0] 1= Put output into a subdirectory under --output_dir.
-    --Qsub=             <0|1> [0] 1= Qsub the script. 
+    --Qsub|q=             <0|1> [0] 1= Qsub the script. 
     --help|?\n";
 }
 
+if ( !$options{input} && $ARGV[0] ) { $options{input} = $ARGV[0]; }
 if ( !$options{input} && !$options{input_list} ) { die "Must give an --input=<BAM> or --input_list=<list_of_bams>\n"; }
 my $append = defined $options{append} ? "$options{append}" : "0";
 
@@ -105,6 +106,5 @@ foreach my $input (@$input) {
     map { print $OUT "$counts{$_}\t" } @read_types;
     my $finished = Time::SoFar::runinterval();
     print $OUT "Time elapsed: $finished\n";
-    close $OUT;
 }
 

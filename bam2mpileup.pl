@@ -7,14 +7,14 @@ use setup_input;
 use File::Basename;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
-my $results = GetOptions( \%options, 'input=s', 'input_list=s', 'sort=s', 'output_prefix=s', 'output_dir=s', 'Qsub=s', 'region=s', 'A=s', 'd=s', 'M_M=s', 'M_UM=s', 'help', 'ref=s', )
+my $results = GetOptions( \%options, 'input|i=s', 'input_list|I=s', 'sort=s', 'output_prefix|p=s', 'output_dir|o=s', 'Qsub|q=s', 'region=s', 'A=s', 'd=s', 'M_M=s', 'M_UM=s', 'help|?', 'ref=s', )
     or die "Error: Unrecognized command line option. Please try again.\n";
 
 if ( $options{help} ) {
     die "HELP: This script will take a bam file and calculate the coverage.
-        --input=            Input bam (Position sorted already)
+        --input=            Input bam (Position sorted)
         --input_list=       List of bams to process.
-        --sort=             <0|1> [0] 1= Sort input by position. In order to calc. mpileup input must be position sorted.
+        --sort=             <0|1> [0] 1= Sort input by position. In order to calc. mpileup, the input must be position sorted.
          --threads=          [1] # threads to use for sorting.
          --sort_mem=         [1G] Amount of RAM to use for sorting.  
         --ref=              Reference fasta + index. 

@@ -13,7 +13,7 @@ use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
 my $results = GetOptions(
     \%options,         'input|i=s',         'sort|S=i',       'window_size|w=i', 'step_size|s=i', 'min_cov|c=i',
-    'min_quality|q=i', 'output_prefix|p=s', 'output_dir|o=s', 'tdo=i',           'Qsub|Q=i',      'region|r=s',
+    'min_quality|q=i', 'output_prefix|p=s', 'output_dir|o=s', 'tdo=i',           'Qsub|q=i',      'region|r=s',
     'A=i',             'd=i',               'M_M=i',          'M_UM=i',          'help|?',
 ) or die "Unrecognized command line option. Please try agian.\n";
 
@@ -155,7 +155,7 @@ sub help {
         --output_prefix=   Prefix for the output.
         --output_dir|o=    Directory for output.
         --tdo=             <0|1> [0] 1= Tab Delimited Output of chr and position. 0= IGV style.
-        --Qsub|Q=          <0|1> [0] 1= Qsub job to grid.
+        --Qsub|q=          <0|1> [0] 1= Qsub job to grid.
     --help|?\n";
 }
 

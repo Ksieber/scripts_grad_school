@@ -28,7 +28,7 @@ use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
 my $results = GetOptions(
     \%options,             'fasta|f=s',            'bam|b=s',        'db=s',               'formatdb=i', 'm8=i',
-    'evalue_cutoff=s',     'best_hits_only|bho=i', 'output_dir|o=s', 'output_prefix|op=s', 'Qsub|Q=i',   'sub_name=s',
+    'evalue_cutoff=s',     'best_hits_only|bho=i', 'output_dir|o=s', 'output_prefix|op=s', 'Qsub|q=i',   'sub_name=s',
     'print_hostname|ph=i', 'subdirs=i',            'threads|t=i',    'conf_file=s',        'verbose=i',  'help|h',
 ) or die "Error: Unrecognized command line option. Please try again.\n";
 
@@ -162,7 +162,7 @@ sub help {
           --output_prefix|op=       Name of prefix for the output. 
           --subdirs=            <0|1> [0] 1 = Create a new subdirectory for each input in the output directory.
     ----------------------------------------------------------------------------------------------------
-        --Qsub|Q=           <0|1> [0] 1 = Submit the job to the grid.
+        --Qsub|q=           <0|1> [0] 1 = Submit the job to the grid.
           --sub_name=           Name of the job to submit.
           --project=            [jdhotopp-lab] Grid project to use.
     ----------------------------------------------------------------------------------------------------    

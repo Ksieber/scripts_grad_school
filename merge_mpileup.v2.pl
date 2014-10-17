@@ -8,15 +8,15 @@ use List::MoreUtils qw( minmax );
 use File::Basename;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
-my $results = GetOptions( \%options, 'input=s', 'input_list=s', 'output_dir=s', 'output_prefix=s', 'min_max=s', 'chr_min_max=s', 'help|?', )
+my $results = GetOptions( \%options, 'input|i=s', 'input_list|I=s', 'output_dir|o=s', 'output_prefix|p=s', 'min_max=s', 'chr_min_max=s', 'help|?', )
     or die "Error: Unrecognized command line option. Please try again.\n";
 
 if ( $options{help} ) {
     die "HELP: This script will take a list of mpileup files and merge them by position.
-	--input=		Directory to find all mpileup files from.
-	--input_list=		List of the files to merge. 1 file per line. \tREQUIRED.
-	--output_dir=		Directory to put the output.\t\t\tOPTIONAL.
-	--output_prefix=	Prefix for output. \$prefix\_merged-mpileup.txt \t\t\t\tOPTIONAL.
+	--input|i=		Directory to find all mpileup files from.
+	--input_list|I=		List of the files to merge. 1 file per line. \tREQUIRED.
+	--output_dir|o=		Directory to put the output.\t\t\tOPTIONAL.
+	--output_prefix|p=	Prefix for output. \$prefix\_merged-mpileup.txt \t\t\t\tOPTIONAL.
 	--min_max=		<100-200> Override the min/max values for ALL chr (warning, be smart with this).
 	--chr_min_max=		<chr:100-200> Override the min/max values for ONE chr.
     --help|?\n";

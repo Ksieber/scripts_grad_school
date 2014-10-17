@@ -2,8 +2,7 @@
 use warnings;
 no warnings 'uninitialized';
 use strict;
-use lib ( "/local/projects-t3/HLGT/scripts/lgtseek/lib/", "/local/projects/ergatis/package-driley/lib/perl5/x86_64-linux-thread-multi/" )
-    ;    ### May need to change this depending on where the script is being run
+use lib ( "/local/projects-t3/HLGT/scripts/lgtseek/lib/", "/local/projects/ergatis/package-driley/lib/perl5/x86_64-linux-thread-multi/" );
 use LGTSeek;
 use run_cmd;
 use mk_dir;
@@ -14,7 +13,7 @@ use File::Basename;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
 my $results
-    = GetOptions( \%options, 'input|i=s', 'input_list|I=s', 'output_dir|o=s', 'output_prefix|p=s', 'Qsub|Q=i', 'subdirs=s', 'conf_file=s', 'help|?', 'sub_name=s', 'sub_mail=s', 'iter=i', 'merge=i' );
+    = GetOptions( \%options, 'input|i=s', 'input_list|I=s', 'output_dir|o=s', 'output_prefix|p=s', 'Qsub|q=i', 'subdirs=s', 'conf_file=s', 'help|?', 'sub_name=s', 'sub_mail=s', 'iter=i', 'merge=i' );
 
 if ( $options{help} ) {
     die "Help:
@@ -29,7 +28,7 @@ if ( $options{help} ) {
       --subdirs=        <0|1> [0] 1= Make a new directory within output_dir for each input directory.
       --output_prefix|p=  Prefix name for the merged output. [Input dir name]
     ----------------------------------------------------------------------------------------
-    --Qsub|Q=i          <0|1> [0] 1= Qsub the job to the grid. 
+    --Qsub|q=i          <0|1> [0] 1= Qsub the job to the grid. 
      --sub_mail=        [0] 1= email user\@som.umaryland.edu when job is complete & with stats. Can also specify --sub_mail=specific\@email.foo
     ----------------------------------------------------------------------------------------
     --help|?

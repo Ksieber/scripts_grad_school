@@ -27,7 +27,7 @@ use strict;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
 my $results = GetOptions(
-    \%options,        'input|i=s',           'input_list|I=s',   'Qsub|Q=i',        'sub_mem|mf=s',      'sub_name=s',        'excl=i',           'no_gal=i',
+    \%options,        'input|i=s',           'input_list|I=s',   'Qsub|q=i',        'sub_mem|mf=s',      'sub_name=s',        'excl=i',           'no_gal=i',
     'hostname=s',     'decrypt=i',           'url=s',            'prelim_filter=i', 'name_sort_input=i', 'keep_softclip=i',   'split_bam=i',      'seqs_per_file=i',
     'aln1_human=i',   'aln2_human=i',        'split_bac_list=s', 'hg19_ref=s',      'refseq_list=s',     'output_dir|o=s',    'subdirs=i',        'tcga_dirs=i',
     'lgt_coverage=i', 'max_overlap=i',       'min_length=i',     'bin_dir=s',       'samtools_bin=s',    'ergatis_bin=s',     'prinseq_bin=s',    'donor_lineage=s',
@@ -399,7 +399,7 @@ sub help_full {
     --aln2_human=           <0|1> [0] 1= Secondary aln to hg19. Useful for mapping to standarized hg19 after prelim_filter.
          __________________
     ____/Submit to SGE-grid\\_____________________________________________________________________
-    --Qsub|Q=               <0|1> [0] 1= qsub the job to the grid.
+    --Qsub|q=               <0|1> [0] 1= qsub the job to the grid.
     --threads=|t            [1] # of CPU's to use for multithreading BWA sampe
     --sub_mem|mf=           [5G] Min mem to qsub for on grid
     --sub_name=             [lgtseq] 

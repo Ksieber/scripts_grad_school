@@ -10,7 +10,7 @@ our %options;
 our $results = GetOptions(
     \%options,     'input|i=s',    'input_list=s', 'output_prefix=s',     'output_dir|o=s', 'subdirs=s',    'ref|r=s',          'ref_list=s',
     'threads|t=s', 'disable_SW=s', 'bam_output=s', 'sort_index_output=s', 'mpileup=s',      'no_cleanup=s', 'insert_metrics=s', 'mapped_only=s',
-    'cmd_log=s',   'Qsub|Q=i',     'name=s',       'project=s',           'sub_mem=s',      'help|h',       'help_full|?',        'name_sort_input=i',
+    'cmd_log=s',   'Qsub|q=i',     'name=s',       'project=s',           'sub_mem=s',      'help|h',       'help_full|?',      'name_sort_input=i',
     'sort_mem=s',  'sub_mail=s',
 ) or die "Error: Unrecognized command line option. Please try again.\n";
 
@@ -207,7 +207,7 @@ sub bwa_align {
     }
 
     ## Cleanup intermediate files (.sai)
-    unless ( $options{no_cleanup} == 1 ) {
+    if ( $options{no_cleanup} != 1 ) {
         run_cmd( "rm $output_prefix\.1.sai", $log );
         run_cmd( "rm $output_prefix\.2.sai", $log );
         if ( $options{sort_index_output} == 1 ) {
@@ -245,7 +245,7 @@ sub help_full {
     --mpileup=              <0|1> [0] 1= Calculate pileup coverage on .bam.
     --no_cleanup=           <0|1> [0] 0= Removes .sai files and unsorted.bam with --sort_index_output. 1=No deleting intermediate data. 
     --insert_metrics=       <0|1> [0] 1= Use Picard to calculate insert size metrics.
-    --Qsub|Q=               <0|1> [0] 1= qsub the mapping to SGE grid.
+    --Qsub|q=               <0|1> [0] 1= qsub the mapping to SGE grid.
       --threads|t=          < # >   [1] Set the number of cpu threads to use for bwa aln steps. USE CAREFULLY.
       --project=            [jdhotopp-lab].
       --sub_mem=            [6G] Memory free for qsub.

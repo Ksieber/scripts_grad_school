@@ -31,7 +31,7 @@ use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 our %options;
 my $results = GetOptions(
     \%options,         'input_list|I=s',  'input|i=s',       'name_sort_input=s', 'sort_mem=s',          'split_bam=i',   'encrypt=i',     'key=s',
-    'prelim_filter=i', 'seqs_per_file=i', 'keep_softclip=i', 'Qsub|Q=i',          'excl=i',              'sub_mem=s',     'sub_name=s',    'threads|t=i',
+    'prelim_filter=i', 'seqs_per_file=i', 'keep_softclip=i', 'Qsub|q=i',          'excl=i',              'sub_mem=s',     'sub_name=s',    'threads|t=i',
     'projects=s',      'output_dir|o=s',  'subdirs=i',       'overwrite=s',       'samtools_bin=s',      'ergatis_dir=s', 'output_list=s', 'bin_dir=s',
     'fs=s',            'clovr=s',         'diag',            'verbose=i',         'print_hostname|ph=i', 'config_file=s', 'help|h',        'help_full|?',
     'tcga_dirs=i',     'aln_human=i',     'hg19_ref=s',      'no_gal=i',          'hostname=s',          'sub_mail=s',
@@ -75,7 +75,7 @@ if ( $options{help_full} ) {
         --encrypt=          <0|1> [0] 1= encrypt ** untested **
           --key=            GPG key to use for encryption. ** untested **
         ----------------------------------------------------------------------------------------
-        --Qsub|Q=           <0|1> [0] 1= Qsub this script for each input. 
+        --Qsub|q=           <0|1> [0] 1= Qsub this script for each input. 
           --project=        <project> [jdhotopp-lab] SGE group project to submit command under.
           --sub_mem=        [5G] --sub_mem MUST >= (--threads * --sort_mem)
           --sub_name=       < > Name of the SGE Job.

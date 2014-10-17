@@ -33,7 +33,7 @@ my $results = GetOptions(
     'evalue_cutoff|e=s',
     'best_hits_only=i',
     'combine_PE_lca=i',
-    'Qsub|Q=i',
+    'Qsub|q=i',
     'sub_name=s',
     'sub_mail=s',
     'print_hostname|ph=i',
@@ -115,7 +115,7 @@ sub help {
 		  --output_prefix=		Name of prefix for the output. 
 		  --subdirs=			<0|1> [0] 1 = Create a new subdirectory for each input in the output directory.
 	----------------------------------------------------------------------------------------------------
-		--Qsub|Q=			<0|1> [0] 1 = Submit the job to the grid.
+		--Qsub|q=			<0|1> [0] 1 = Submit the job to the grid.
 		  --sub_name=  			Name of the job to submit.
 		  --project=			[jdhotopp-lab] Grid project to use.
 		  --sub_mail=           [0] 1= email user\@som.umaryland.edu when job is complete & with stats. Can also specify --sub_mail=specific\@email.foo

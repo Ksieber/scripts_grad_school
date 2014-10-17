@@ -9,7 +9,7 @@ use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
 my $results = GetOptions(
     \%options,        'input|i=s',         'name_sort=s', 'threads|t=i', 'sort_mem=s', 'fasta=i', 'no_nums=i', 'interleaved=i',
-    'output_dir|o=s', 'output_prefix|p=s', 'subdirs=s',   'Qsub|Q=s',    'sub_mem=s',  'help|?',
+    'output_dir|o=s', 'output_prefix|p=s', 'subdirs=s',   'Qsub|q=s',    'sub_mem=s',  'help|?',
 ) or die "Unrecognized command line option. Please try agian.\n";
 
 if ( $options{help} ) {
@@ -31,7 +31,7 @@ if ( $options{help} ) {
       --subdirs=              <0|1> [0] 1= Make subdirectory to work from. 
     --output_list=          <0|1> [0] 1= Make list of output fastqs. Comma seperated, 1 pair/line.
     _____________________________________________________________________________________________ 
-    --Qsub|Q=                 <0|1> [0] 1= Qsub. Must use FULL file path names for Qsub.
+    --Qsub|q=                 <0|1> [0] 1= Qsub. Must use FULL file path names for Qsub.
       --sub_mem=              [6G] Must reflect changes in --sort_mem.
     --help|?
     _____________________________________________________________________________________________\n";

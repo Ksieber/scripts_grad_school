@@ -11,7 +11,7 @@ my $results = GetOptions (\%options,
 		'evalue_cutoff=s',
 		'krona|k=i',
 		'best_hits_only|B=i',
-		'Qsub|Q=i',
+		'Qsub|q=i',
 		'help|h',
 		) or die "Error: Unrecognized command line option. Please try again.\n";
 
@@ -96,7 +96,7 @@ sub help {
 	--krona|k=		<0|1> [0] 1= Draw Krona plot.
 	--evalue_cutoff=	Max evalue.		[1]
 	--best_hits_only|B=	<0|1> [0] 1= Parse the btab blast report for best hits only.
-	--Qsub|Q=		<0|1> [0] 1= qsub the job to the grid. 
+	--Qsub|q=		<0|1> [0] 1= qsub the job to the grid. 
 	  --project=		Grid project to use. [jdhotopp-lab]
 	--help|h
 
