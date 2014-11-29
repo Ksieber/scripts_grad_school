@@ -22,6 +22,9 @@ Internal methods are usually preceded with "_"
 
 =cut
 
+my $LGTSEQ_ANALYSIS = '1.00';
+
+use lib ( "/local/projects-t3/HLGT/scripts/lgtseek/lib/", "/local/projects/ergatis/package-driley/lib/perl5/x86_64-linux-thread-multi/" );
 use warnings;
 use strict;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
@@ -33,7 +36,7 @@ my $results = GetOptions(
     'lgt_coverage=i', 'max_overlap=i',       'min_length=i',     'bin_dir=s',       'samtools_bin=s',    'ergatis_bin=s',     'prinseq_bin=s',    'donor_lineage=s',
     'host_lineage=s', 'threads|t=i',         'taxon_host=s',     'taxon_dir=s',     'taxon_idx_dir=s',   'path_to_blastdb=s', 'best_hits_only=i', 'evalue_cutoff=s',
     'verbose|V=i',    'print_hostname|ph=i', 'conf_file=s',      'help|h',          'help_full|?',       'workflow_help',     'conf_help',        'sub_mail=s',
-    'Qsub_iterate=i', 'overwrite=i',
+    'Qsub_iterate=i', 'overwrite=i',         'project=s',
 ) or die "Error: Unrecognized command line option. Please try again.\n";
 
 ## Check if the user needs help information
@@ -46,7 +49,6 @@ use print_call;
 $options{print_hostname} = $options{print_hostname} ? $options{print_hostname} : "0";
 print_hostname( \%options );                          ## This is useful for trouble shooting grid nodes that might be missing modules for LGTSeek etc.
 ### May need to change this depending on where the script is being run
-use lib ( "/local/projects-t3/HLGT/scripts/lgtseek/lib/", "/local/projects/ergatis/package-driley/lib/perl5/x86_64-linux-thread-multi/" );
 use LGTSeek;
 use Time::SoFar;
 use run_cmd;
@@ -56,7 +58,7 @@ $Carp::MaxArgLen = 0;
 use File::Basename;
 
 ## Check we have the necessary inputs
-if ( !$options{input} && !$options{input_list} ) {
+if ( !$options{input} and !$options{input_list} ) {
     confess "Error: Please give an input.bam with --input=<FILE> or --input_list=<LIST>. Try again or use --help_full.\n";
 }
 if ( !$options{output_dir} ) {
@@ -64,14 +66,19 @@ if ( !$options{output_dir} ) {
     sleep 60;
 }
 
-## Qsub the job instead of running it
-if ( !$options{sub_name} ) { $options{sub_name} = "lgtseq"; }
-if ( $options{Qsub} or $options{Qsub_iterate} ) { Qsub_script( \%options ); }
-
-## Print the script call
-print_call( \%options );
 ## Initialize LGTSeek.pm
 my $lgtseek = LGTSeek->new2( \%options );
+
+## Qsub the job instead of running it
+if ( $options{Qsub} or $options{Qsub_iterate} ) {
+    if ( !$options{sub_name} ) { $options{sub_name} = "lgtseq"; }
+    if ( !$options{project} )  { $options{project}  = $lgtseek->{project}; }
+    Qsub_script( \%options );
+}
+
+## Print the script call
+print_call( \%options, "LGTSEQ_ANALYSIS_VERSION=$LGTSEQ_ANALYSIS" );
+
 ## Setup array ref of inputs
 my $inputs = setup_input( \%options );
 
@@ -83,8 +90,9 @@ foreach my $input (@$inputs) {
     my $subdir     = $name;
     my @split_path = split( /\//, $path );
     my $tcga_dir   = $split_path[-1];
-    if ( $lgtseek->{tcga_dirs} == 1 ) { $output_dir = $output_dir . "$tcga_dir\/"; }
-    if ( $lgtseek->{subdirs} == 1 )   { $output_dir = $output_dir . "$subdir\/"; }
+    if ( $lgtseek->{tcga_dirs} == 1 ) { $output_dir = $output_dir . "/$tcga_dir\/" unless ( $output_dir =~ /$tcga_dir\/*$/ ); }
+    if ( $lgtseek->{subdirs} == 1 )   { $output_dir = $output_dir . "/$subdir\/"   unless ( $lgtseek->{output_dir} =~ /$subdir\/*$/ ); }
+    $output_dir =~ s/\/{2,}/\//g;
     run_cmd("mkdir -p -m u=rwx,g=rwx,o= $output_dir");
 
     print_notebook( \%options );
@@ -124,11 +132,11 @@ foreach my $input (@$inputs) {
                 }
             );
         }
-        $input = @$human_bam1[0];
+        $input = $human_bam1->[0];
     }
 
     # Prelim_filter
-    if ( $lgtseek->{prelim_filter} || $lgtseek->{name_sort_input} ) {
+    if ( $lgtseek->{prelim_filter} or $lgtseek->{name_sort_input} ) {
         print STDERR "======== Prelim_filter ========\n";
         my $prelim_filtered_bam = $lgtseek->prelim_filter(
             {    ## &prelim_filter returns an array
@@ -142,7 +150,7 @@ foreach my $input (@$inputs) {
                 overwrite       => $lgtseek->{overwrite},           ## Default = 0
             }
         );                                                          ## ^^                              ^^
-        $input = @$prelim_filtered_bam[0];                          ## This works because we are not splitting bams
+        $input = $prelim_filtered_bam->[0];                         ## This works because we are not splitting bams
     }
 
     # Secondary aln human
@@ -159,7 +167,7 @@ foreach my $input (@$inputs) {
                 cleanup_sai => 1,
             }
         );
-        $input = @$human_bam2[0];
+        $input = $human_bam2->[0];
     }
 
     # Align to the Bacteria.
@@ -202,7 +210,8 @@ foreach my $input (@$inputs) {
     # Clean up output we don't need anymore; This is IMPORTANT on nodes. Not so much on filesystem.
     $lgtseek->_run_cmd("rm -rf $output_dir/human_aln1/");
     $lgtseek->_run_cmd("rm -rf $output_dir/human_aln2/");
-    $lgtseek->_run_cmd("rm -rf $output_dir/prelim_filter/");
+
+    # $lgtseek->_run_cmd("rm -rf $output_dir/prelim_filter/"); #FOOBAR
     $lgtseek->_run_cmd("rm -rf $output_dir/bacterial_alignments/");
 
     ##++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -211,15 +220,15 @@ foreach my $input (@$inputs) {
     ## Check to make sure we found LGT.
     print STDERR "======== LGT ========\n";
     if ( $lgtseek->empty_chk( { input => $pp_data->{files}->{lgt_donor} } ) ) {
-        print STDERR "***Warning*** No LGT in: $pp_data->{files}->{lgt_donor}\. Skipping LGT LCA calculation and blast validation.\n";
+        print STDERR "***Warning*** No LGT in: $pp_data->{files}->{lgt_donor}\. Skipping further LGT analysis.\n";
     }
     else {
         # Prinseq filter the putative lgts
         # This is for manual curation later. Use all potential LGT for further analysis.
-        print STDERR "======= LGT-PRINSEQ =======\n";
+        print STDERR "======== LGT-PRINSEQ =======\n";
         my $filtered_bam = $lgtseek->prinseqFilterBam(
-            {   output_dir => $output_dir,
-                input_bam  => $pp_data->{files}->{lgt_host}
+            {   input_bam  => $pp_data->{files}->{lgt_host},
+                output_dir => $output_dir,
             }
         );
 
@@ -264,7 +273,7 @@ foreach my $input (@$inputs) {
         );
 
         # LGTFinder
-        print STDERR "======== LGTFINDER =========\n";
+        print STDERR "======== LGT-FINDER =========\n";
         my $valid_lgts = $lgtseek->runLgtFinder(
             {   input_file_list => $best_blasts->{list_file},
                 lineage1        => $lgtseek->{donor_lineage},
@@ -277,17 +286,48 @@ foreach my $input (@$inputs) {
         );
 
         print STDERR "======== VALID-BLAST-PP =========\n";
-        ## Create a new bam from blast validation & lgtfinder results && add #'s to post_processing.tab
-        my $blast_validated_lgt_bam = $lgtseek->validated_bam(
+        ## Create a new bam from blast validation & lgtfinder results and add #'s to post_processing.tab
+        my $blast_validated_lgt = $lgtseek->validated_bam(
             {   input    => $filtered_bam->{bam},
                 by_clone => $valid_lgts->{by_clone},
                 output   => "$output_dir/$name\_lgt_host_filtered_validated.bam"
             }
         );
-        ## Add # validated to post_processing.tab
+
+        ## Add numbers for validated-LGT to post_processing.tab
         push( @header, 'lgt_valid_blast' );
-        push( @vals,   "$blast_validated_lgt_bam->{count}" );
+        push( @vals,   "$blast_validated_lgt->{count}" );
         &print_tab( "$output_dir/$name\_post_processing.tab", \@header, \@vals );
+
+        print STDERR "======== LGT-ALN-HG19 =======\n";
+        my $hg19_lgt_bam = $lgtseek->runBWA(
+            {   input_bam   => $blast_validated_lgt->{bam},
+                output_bam  => 1,
+                threads     => $lgtseek->{threads},
+                output_dir  => $output_dir,
+                reference   => $lgtseek->{hg19_ref},
+                overwrite   => $lgtseek->{overwrite},
+                cleanup_sai => 1,
+            }
+        );
+
+        # Fix the header for the final LGT bam.
+        my $Picard        = "$lgtseek->{java_bin} \-$lgtseek->{java_opts} -jar $lgtseek->{Picard_jar}";
+        my $cmd           = "$Picard AddCommentsToBam I=$hg19_lgt_bam->[0] O=$output_dir/$name\_lgt_final.bam";
+        my $header_string = $lgtseek->_run_cmd("samtools view -H $blast_validated_lgt->{bam}");
+        print STDERR "FOO1: $header_string\n";
+        my @pg_list = grep( /^\@PG|^\@CO/, split( /\n/, $header_string ) );
+        print STDERR "Foo2: @pg_list\n";
+        map {
+            if ( $_ !~ /ID:bwa/ ) {
+                my @split_pg_line = split( /\t/, $_ );
+                shift(@split_pg_line);    # remove BWA \@PG line
+                my $comment_line = join( "\t", @split_pg_line );
+                $cmd = $cmd . " C=\"$comment_line\"";
+            }
+        } @pg_list;
+        $lgtseek->_run_cmd("$cmd");
+        $lgtseek->_run_cmd("rm $hg19_lgt_bam->[0]");
 
         # Run blast and keep raw output
         #my $blast_ret = $lgtseek->_run_cmd("blastall -p blastn -a $lgtseek->{threads} -e 10e-5 -T F -d $lgtseek->{path_to_blastdb} -i $lgt_fasta > $output_dir/blast_validation/$name\_blast.raw");
@@ -301,6 +341,7 @@ foreach my $input (@$inputs) {
     ## Check to make sure we found Microbiome Reads. If no microbiome reads skip this step.
     if ( $lgtseek->empty_chk( { input => "$output_dir\/$name\_microbiome.bam" } ) ) {
         print STDERR "***Warning*** No Microbiome reads in: $output_dir\/$name\_microbiome.bam. Skipping microbiome LCA calculation.\n";
+        print_complete( \%options, "LGTSEQ_ANALYSIS_VERSION=$LGTSEQ_ANALYSIS" );
     }
     else {
 
@@ -308,7 +349,7 @@ foreach my $input (@$inputs) {
         # Use only prinseq quality reads for microbiome analysis
         print STDERR "===== Microbiome-PRINSEQ =====\n";
         my $filtered_bam = $lgtseek->prinseqFilterBam(
-            {   input_bam  => $pp_data->{files}->{microbiome_donor},    ## KBS 01.08.14 "$output_dir\/$name\_microbiome.bam",
+            {   input_bam  => $pp_data->{files}->{microbiome_donor},
                 output_dir => $output_dir,
             }
         );
@@ -354,7 +395,7 @@ foreach my $input (@$inputs) {
     }
 
     $lgtseek->time_check;
-    print_complete( \%options );
+    print_complete( \%options, "LGTSEQ_ANALYSIS_VERSION=$LGTSEQ_ANALYSIS" );
 }
 
 ## Subroutines
@@ -376,7 +417,8 @@ sub help {
 }
 
 sub help_full {
-    die "Help: This script takes a bam and identifies bacterial human LGT.
+    die "   LGTSEQ_ANALYSIS_VERSION    $LGTSEQ_ANALYSIS
+    Help: This script takes a bam and identifies bacterial human LGT.
          _____
     ____/Input\\_________________________________________________________________________________
     --input|i=              <Input BAM or fastq> **MUST** be name sorted. Also use --prelim_filter & --name_sort_input for position sorted inputs.
@@ -404,7 +446,7 @@ sub help_full {
     --Qsub|q=               <0|1> [0] 1= qsub the job to the grid.
     --Qsub_iterate=         <0|1> [0] 1= Iterate over --input_list instead of qsub'ing each file from a list. 
       --threads=|t          [1] # of CPU's to use for multithreading BWA sampe
-      --sub_mem|mf=         [5G] Min mem to qsub for on grid
+      --sub_mem|mf=         [4G] Min mem to qsub for on grid
       --sub_name=           [lgtseq] 
       --sub_mail=           [0] 1= email user\@som.umaryland.edu when job is complete & with stats. Can also specify --sub_mail=specific\@email.foo
       --project=            Grid project to use. 
@@ -432,7 +474,7 @@ sub workflow_help {
     ----------------------------------------------------------------------------------------\n";
 }
 
-## This section isn't complete yet && not check to make sure these param's ARE in the .conf file
+## This section isn't complete yet and not check to make sure these param's ARE in the .conf file
 sub conf_help {
     die "== The .lgtseek.conf file options. Options with \"\*\" are mandatory. This list is NOT an exhaustive list of mandatory options (yet).
 == The format of the ~/.lgtseek.conf is \"tab\" (white space) delimited \$option_name \\t \$option_value. ex: threads    4

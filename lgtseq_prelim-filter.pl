@@ -2,15 +2,16 @@
 
 =head1 NAME
 
-bam_prep_for_lgt_seq.pl
+lgtseq_prelim-filter.pl
 
 =head1 SYNOPSIS
 
-Split, encrypt, and/or prelim filter a bam for lgt_seq.pl 
+Prelim filter a bam for lgtseq_analysis.pl 
 
 =head1 DESCRIPTION
 
-Split, encrypt, and/or prelim filter a bam for lgt_seq.pl 
+Prelim filter and split a human mapped bam for potetional bacterial DNA integration and microbiome reads before running lgtseq_analysis.pl,
+allowing for lgtseq_analysis.pl to run dramatically quicker.
 
 =head1 AUTHOR - Karsten Sieber
 
@@ -22,6 +23,8 @@ The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with a _
 
 =cut
+
+my $LGTSEQ_PRELIM = '1.00';
 
 use warnings;
 no warnings 'uninitialized';
@@ -44,7 +47,8 @@ use print_call;
 use Scalar::Util qw(reftype);
 use POSIX;
 use run_cmd;
-use lib ( '/local/projects-t3/HLGT/scripts/lgtseek/lib/', '/local/projects/ergatis/package-driley/lib/perl5/x86_64-linux-thread-multi/' );
+use lib ( '/home/ksieber/perl5/lib/perl5/', '/local/projects-t3/HLGT/scripts/lgtseek/lib/', '/local/projects/ergatis/package-driley/lib/perl5/x86_64-linux-thread-multi/' )
+    ;    # 11.11.14 Added '/home/ksieber/perl5/lib/perl5/' to lib, may break it?
 use LGTSeek;
 use File::Basename;
 use setup_input;
@@ -59,7 +63,8 @@ if ( $options{help} ) {
 }
 
 if ( $options{help_full} ) {
-    die "Help Full Info: This script will remove M_M reads, keeping M_U, U_U, M_M with Softclip. The output bams are split into smaller chunks.
+    die "   LGTSEQ_PRELIM_VERSION  $LGTSEQ_PRELIM
+    Help Full Info: This script will remove M_M reads, keeping M_U, U_U, M_M with Softclip. The output bams are split into smaller chunks.
     This script is primarily used to filter data before lgtseq_analysis.pl. It can also download CGHub data, filter, and start lgtseq_analysis.pl
              _____________
         ____/Input Options\\__________________________________________________________________________
@@ -73,7 +78,7 @@ if ( $options{help_full} ) {
         --name_sort_input=      <0|1> [0] 1= Resort the input bam by read names.
           --sort_mem=           [1G] Mem per thread to sort with. 
           --threads=            [1] # of threads. 
-        --name_sort_check=    <0|1> [--name_sort_input] 1= Quick & dirty check for proper pairing of sorted.bam. 
+        --name_sort_check=      <0|1> [--name_sort_input] 1= Quick & dirty check for proper pairing of sorted.bam. 
         --split_bam=            <0|1> [1] 1= Split bam(s)
           --seqs_per_file=      <lines per bam> [50,000,000]
              ______________
@@ -82,7 +87,7 @@ if ( $options{help_full} ) {
          --tcga_dirs=           <0|1> [0] 1= Make the sub-dir prefix the input's last folder in path (Maintain TCGA analysis_id directory structure)
           --subdirs=            <0|1> [0] 1= Make the sub-dir prefix in output_dir based on input name.
         --overwrite=            <0|1> [0] 1= Overwrite previous files.
-        --cleanup_download      <0|1> [0] 1= Remove downloaded bam after prelim filter is complete.
+        --cleanup_download      <0|1> [1] 1= Remove downloaded bam after prelim filter is complete.
              ___________
         ____/SGE Options\\____________________________________________________________________________
         --Qsub|q=               <0|1> [0] 1= Qsub this script for each input.
@@ -108,12 +113,13 @@ if ( $options{help_full} ) {
         ----------------------------------------------------------------------------------------------\n";
 }
 
-if ( !$options{input} && !$options{input_list} ) { die "Error: Must give input with --input=<BAM> or --input_list=<LIST of bams>\n"; }
+if ( !$options{input} and !$options{input_list} ) { die "Error: Must give input with --input=<BAM> or --input_list=<LIST of bams>\n"; }
 
 ## Set default values
 $options{prelim_filter} = defined $options{prelim_filter} ? "$options{prelim_filter}" : "1";
 $options{sub_mem}       = defined $options{sub_mem}       ? "$options{sub_mem}"       : "5G";
 $options{output_list}   = defined $options{output_list}   ? "$options{output_list}"   : "1";
+if ( defined $options{input_list} and $options{input_list} == 1 ) { $options{subdirs} = 1; }
 
 my $lgtseek = LGTSeek->new2( \%options );
 
@@ -131,21 +137,35 @@ my $x = 0;
 my $original_output_dir = $lgtseek->{output_dir};
 
 foreach my $input (@$input) {
-    $x++;
+
+    # Set a few defaults
+    if ( $input =~ /\w{8}\-\w{4}\-\w{4}\-\w{4}\-\w{12}/ and $input !~ /bam$|fq$|fastq$/ ) {
+        $lgtseek->{tcga_dirs} = 1;        # If we have a TCGA analysis ID, make sure --tcga_dirs is on.
+        $options{name_sort_input} = 1;    # We know if we download the file we have to name sort it.
+        $options{cleanup_download} = 1 unless ( defined $options{cleanup_download} and $options{cleanup_download} == 0 );    # Unless we specifically said NOT to cleanup the download, delete it
+    }
+
     my ( $fn, $path, $suf ) = fileparse( $input, ( '_resorted.bam', '\.sorted.bam', '.bam' ) );
-    my $subdir     = $fn;
+    my $subdir = ( $suf =~ /bam$|fq$|fastq$/ ) ? $fn : undef;
     my @split_path = split( /\//, $path );
-    my $tcga_dir   = $split_path[-1];
+    my $tcga_dir = ( $suf =~ /bam$|fq$|fastq$/ ) ? $split_path[-1] : $fn;
     $lgtseek->{output_dir} = $original_output_dir;
-    if ( $lgtseek->{tcga_dirs} == 1 && !$options{Qsub_iterate} ) { $lgtseek->{output_dir} = $lgtseek->{output_dir} . "/$tcga_dir\/"; }
-    if ( $lgtseek->{subdirs} == 1   && !$options{Qsub_iterate} ) { $lgtseek->{output_dir} = $lgtseek->{output_dir} . "/$subdir\/"; }
+
+    if ( $lgtseek->{tcga_dirs} == 1 and !$options{Qsub_iterate} ) {
+        $lgtseek->{output_dir} = $lgtseek->{output_dir} . "/$tcga_dir\/" unless ( $lgtseek->{output_dir} =~ /$tcga_dir\/*$/ );
+    }
+
+    if ( $lgtseek->{subdirs} == 1 and !$options{Qsub_iterate} and defined $subdir ) {
+        $lgtseek->{output_dir} = $lgtseek->{output_dir} . "/$subdir\/" unless ( $lgtseek->{output_dir} =~ /$subdir\/*$/ );
+    }
+    $lgtseek->{output_dir} =~ s/\/{2,}/\//g;
     $options{output_dir} = $lgtseek->{output_dir};
     $lgtseek->_run_cmd("mkdir -p -m u=rwx,g=rwx,o= $lgtseek->{output_dir}");
 
     ## Qsub this script foreach input and any of the options passed
     if ( $lgtseek->{Qsub} == 1 or $options{Qsub_iterate} == 1 ) {
         ## If we are in the orignal call, change input from list to a single file
-        if ( $options{input_list} && !$options{Qsub_iterate} ) { $options{input} = $input; }
+        if ( $options{input_list} and !$options{Qsub_iterate} ) { $options{input} = $input; }
         ## Check $sub_mem is enough for sorting
         if ( $lgtseek->{name_sort_input} == 1 ) {
             my $original_sub_mem;
@@ -161,10 +181,10 @@ foreach my $input (@$input) {
         my $cmd = "$^X $0";
         foreach my $key ( keys %options ) {
             next if ( $key eq 'Qsub' );
-            next if ( $key eq 'subdirs' && !$options{Qsub_iterate} );
-            next if ( $key eq 'tcga_dirs' && !$options{Qsub_iterate} );
+            next if ( $key eq 'subdirs' and !$options{Qsub_iterate} );
+            next if ( $key eq 'tcga_dirs' and !$options{Qsub_iterate} );
             next if ( $key eq 'Qsub_iterate' );
-            next if ( !$options{Qsub_iterate} && $options{input_list} && $key eq 'input_list' );    ## If we are in the orignal call, we don't want to qsub more lists
+            next if ( !$options{Qsub_iterate} and $options{input_list} and $key eq 'input_list' );    ## If we are in the orignal call, we don't want to qsub more lists
             if ( defined $options{$key} ) { $cmd = $cmd . " --$key=$options{$key}" }
         }
         my $sub_name = $options{sub_name} ? $options{sub_name} : "prelim$x";
@@ -174,22 +194,21 @@ foreach my $input (@$input) {
                 wd       => $lgtseek->{output_dir},
                 sub_name => $sub_name,
                 sub_mem  => $options{sub_mem},
+                sub_mail => $options{sub_mail},
                 threads  => $lgtseek->{threads},
                 project  => $lgtseek->{project},
                 hostname => $options{hostname},
-                excl     => $options{excl},
             }
         );
-
+        $x++;
         ## Skip to next input for qsub
         next;
     }
 
-    $options{output_dir} = $lgtseek->{output_dir};
     print_notebook( \%options );
 
     my $bam_downloaded;
-    if ( $input =~ /\w{8}\-\w{4}\-\w{4}\-\w{4}\-\w{12}/ && $input !~ /\.bam$|fq$|fastq$/ ) {
+    if ( $input =~ /\w{8}\-\w{4}\-\w{4}\-\w{4}\-\w{12}/ and $input !~ /\.bam$|fq$|fastq$/ ) {
         $bam_downloaded = $lgtseek->downloadCGHub(
             {   analysis_id => $input,
                 output_dir  => $lgtseek->{output_dir},
@@ -280,28 +299,35 @@ foreach my $input (@$input) {
     }
 
     # Delete the downloaded file if --cleanup_download==1, keeping _prelim.bams
-    if ( $lgtseek->{cleanup_download} == 1 && -e $bam_downloaded->{bam_files}->[0] ) {
+    if ( $lgtseek->{cleanup_download} == 1 and -e $bam_downloaded->{bam_files}->[0] ) {
         my ( $name, $path, $suffix ) = fileparse( $bam_downloaded->{bam_files}->[0], ".bam" );
         $lgtseek->_run_cmd("rm -rf $path");
-        $lgtseek->_run_cmd("rm $lgtseek->{output_dir}/*.gto");
+        $lgtseek->_run_cmd("rm $lgtseek->{output_dir}*.xml");
+        $lgtseek->_run_cmd("rm $lgtseek->{output_dir}*.gto");
     }
 
     if ( $options{launch_analysis} == 1 ) {
-        my $analysis_dir     = $options{analysis_dir}     ? $options{analysis_dir}     : $original_output_dir;
+
+        # my $analysis_dir     = $options{analysis_dir}     ? $options{analysis_dir}     : $original_output_dir; ## Old
+        my $analysis_dir = $options{analysis_dir} ? $options{analysis_dir} : $lgtseek->{output_dir};    ## New 11.09.14
+               # if ( $options{tcga_dirs} == 1 ) { $analysis_dir = $analysis_dir . "/$tcga_dir\/"; }                               ## Old
+        if ( $options{analysis_dir} and $options{tcga_dirs} == 1 ) { $analysis_dir = $analysis_dir . "/$tcga_dir\/"; }    ## New 11.09.14
+
         my $analysis_threads = $options{analysis_threads} ? $options{analysis_threads} : $lgtseek->{threads};
-        if ( $options{tcga_dirs} == 1 ) { $analysis_dir = $analysis_dir . "/$tcga_dir\/"; }
         my $lgtseq_analysis_cmd
             = "/home/ksieber/scripts/lgtseq_analysis.pl --input_list=$lgtseek->{output_dir}/output.list --output_dir=$analysis_dir --threads=$analysis_threads --sub_mem=$lgtseek->{sub_mem} --subdirs=1";
-        if   ( !$options{tcga_dirs} )         { $lgtseq_analysis_cmd = $lgtseq_analysis_cmd . " --tcga_dirs=1"; }
+
+        # if   ( !$options{tcga_dirs} )         { $lgtseq_analysis_cmd = $lgtseq_analysis_cmd . " --tcga_dirs=1"; } ## OLD
         if   ( $options{analysis_iter} == 1 ) { $lgtseq_analysis_cmd = $lgtseq_analysis_cmd . " --Qsub_iterate=1"; }
         else                                  { $lgtseq_analysis_cmd = $lgtseq_analysis_cmd . " --Qsub=1"; }
-        if ( $options{verbose} == 1 ) { $lgtseq_analysis_cmd = $lgtseq_analysis_cmd . " --verbose=1"; }
+        if ( $options{verbose} == 1 )  { $lgtseq_analysis_cmd = $lgtseq_analysis_cmd . " --verbose=1"; }
+        if ( $options{sub_mail} == 1 ) { $lgtseq_analysis_cmd = $lgtseq_analysis_cmd . " --sub_mail=$options{sub_mail}"; }
         if ( $options{verbose} ) { print STDERR "======== &prelim_filter: Starting lgtseq_analysis.pl on: $lgtseek->{output_dir}/output.list. +++\n"; }
         Qsub( { cmd => $lgtseq_analysis_cmd } );
     }
 }
 
-&print_complete( \%options );
+&print_complete( \%options, "LGTSEQ_PRELIM_VERSION=$LGTSEQ_PRELIM" );
 
 __END__
 
