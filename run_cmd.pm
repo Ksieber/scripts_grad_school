@@ -8,18 +8,19 @@ $Carp::MaxArgLen = 0;    ## Report full length error
 use Exporter;
 our @ISA    = qw(Exporter);
 our @EXPORT = qw( run_cmd setup_logs Qsub Qsub_script );
-## &run_cmd records a unix cmd, executes it, checks it did not fail
+## &run_cmd logs a unix cmd, executes it, checks it did not fail
 ## &run_cmd can also take a fh to log the commands to the fh
-## &setup_logs takes a hash ref. of input=>output_dirs and returns a hash reference (input=>fh);
+## &setup_logs takes a hash ref. of input->output_dirs and returns a hash reference (input->fh);
 ## if &setup_logs isn't run, &run_cmd will log the cmd to STDERR
-## &Qsub will take a shell script || command and qsub it to the grid
+## &Qsub will take a shell script or command and qsub it to the grid
 ## &Qsub prints qsub info to STDERR
-## Suggested use: my $cmd = "perl foo.pl";
-## Suggested use: my $cmd_log=setup_logs($out_dirs);
-## Suggested use: my $log = $cmd_log->{$file};
-## Suggested use: Qsub("echo foo",$log);
-## Suggested use: run_cmd("bwa aln foo.bam ...");
-## Suggested use: run_cmd($cmd,$cmd_log->{$file});
+
+## Suggested use: my $cmd = "perl foo.pl --input=something_important --output_dir=/some/place/";
+## Suggested use: run_cmd($cmd,$log);
+## Suggested use: Qsub($cmd,$log);
+## Suggested use: Qsub({ cmd=> $cmd, threads=> 4, sub_mem=>"4G", wd=>$output_dir })
+## Suggested use: Qsub_script(\%options);
+
 
 =head2 run_cmd
     Title       : run_cmd
@@ -116,7 +117,7 @@ sub Qsub {
 
 sub Qsub_script {
     my $options = $_[0] || confess "Error: &Qsub_script didn't receive a hash ref properly: $!\n";
-    if ( ref($options) ne "HASH" ) { confess "Error: &Qsub_script didn't receive a hash ref properly: $!\n"; }    ## 08.06.14 Trial
+    if ( ref($options) ne "HASH" ) { confess "Error: &Qsub_script didn't receive a hash ref properly: $!\n"; }
 
     ## Setup Qsub command:
     my $opts;
@@ -128,7 +129,7 @@ sub Qsub_script {
     $opts->{sub_mem}  = defined $options->{sub_mem}  ? " -l mf=$options->{sub_mem}"            : " -l mf=1G";
     $opts->{project}  = defined $options->{project}  ? " -P $options->{project}"               : " -P jdhotopp-lab";
     $opts->{cwd}      = defined $options->{cwd}      ? " -cwd"                                 : undef;
-    $opts->{sub_name} = defined $options->{sub_name} ? " -N $options->{sub_name}"              : undef;                ## KBS 01.07.14 " -N ksieber";
+    $opts->{sub_name} = defined $options->{sub_name} ? " -N $options->{sub_name}"              : undef;
     $opts->{hostname} = defined $options->{hostname} ? " -l hostname=\"$options->{hostname}\"" : undef;
     undef $opts->{exclusive};
     if ( $options->{excl} ) { $opts->{exclusive} = " -l excl=true"; }
@@ -152,7 +153,7 @@ sub Qsub_script {
     if ( !$options->{input} && !$options->{input_list} && !$options->{bam} && !$options->{fasta} ) {
         confess "Error: No input given. Use --input or --input_list.\n";
     }
-    if ( !$options->{output_dir} ) { confess "Error: No output directory given. Use --output_dir.\n"; }
+
     my @inputList;
     my %out_dirs;
     if ( $options->{input_list} && !$options->{Qsub_iterate} ) {
@@ -177,13 +178,13 @@ sub Qsub_script {
         push( @inputList, $options->{fasta} );
     }
 
-    my $original_output_dir = $options->{output_dir};
-    run_cmd("mkdir -p -m u=rwx,g=rwx,o= $options->{output_dir}");
+    my $original_output_dir = defined $options->{output_dir} ? $options->{output_dir} : undef;
 
     ## Build and submit commands
     foreach my $input (@inputList) {
-        $options->{output_dir} = $original_output_dir;
         my ( $name, $path, $suf ) = fileparse( $input, qr/\.[^\.]+/ );
+        $options->{output_dir} = defined $original_output_dir ? $original_output_dir : $path;
+        run_cmd("mkdir -p -m u=rwx,g=rwx,o= $options->{output_dir}");
         my $subdir     = $name;
         my @split_path = split( /\//, $path );
         my $tcga_dir   = $split_path[-1];
@@ -301,9 +302,9 @@ sub _Qsub_opt {
     ## SGE mail; if sub_mail=1 defaults to username\@som.umaryland.edu else it mails to specified sub_mail=Whatever@email.foo
     chomp( my $user_name = `whoami` );
     my $sub_mail;
-    if    ( $config->{sub_mail} =~ /\w+\.\w{3}/ ) { $sub_mail = " -M $config->{sub_mail} -m aes"; }
-    elsif ( $config->{sub_mail} == 1 )            { $sub_mail = " -M $user_name\@som.umaryland.edu -m aes"; }
-    else                                          { undef $sub_mail; }
+    if    ( $config->{sub_mail} =~ /\w+\@\w+\.\w{3}/ ) { $sub_mail = " -M $config->{sub_mail} -m aes"; }
+    elsif ( $config->{sub_mail} == 1 )                 { $sub_mail = " -M $user_name\@som.umaryland.edu -m aes"; }
+    else                                               { undef $sub_mail; }
 
     if ($log) {
         open( $fh, ">>", "$log" ) or confess "Can't open: $fh because: $!\n";

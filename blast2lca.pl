@@ -34,6 +34,7 @@ my $results = GetOptions(
     'best_hits_only=i',
     'combine_PE_lca=i',
     'Qsub|q=i',
+    'project=s',
     'sub_name=s',
     'sub_mail=s',
     'print_hostname|ph=i',
@@ -45,7 +46,7 @@ my $results = GetOptions(
     'taxon_idx_dir=s',
     'conf_file=s',
     'verbose=i',
-    'help|h',
+    'help|?',
 ) or die "Error: Unrecognized command line option. Please try again.\n";
 
 use lib ( "/local/projects-t3/HLGT/scripts/lgtseek/lib/", "/local/projects/ergatis/package-driley/lib/perl5/x86_64-linux-thread-multi/" );
@@ -60,7 +61,15 @@ $Carp::MaxArgLen = 0;
 use File::Basename;
 
 if ( $options{help} ) { &help; }    ## @ end of script
-if ( !$options{input} && !$options{input_list} ) { confess "Error: Please give an input.bam with --input=<FILE> or --input_list=<LIST>. Try again or use --help_full.\n"; }
+if ( !$options{input} && !$options{input_list} ) { die "Error: Please give an input blast-m8 file with --input=<FILE> or --input_list=<LIST>. Try again or use --help_full.\n"; }
+
+## Qsub:
+my $lgtseek = LGTSeek->new2( \%options );
+if ( $options{Qsub} ) {
+    if ( !$options{sub_name} ) { $options{sub_name} = "m8_2lca"; }
+    if ( !$options{project} )  { $options{project}  = $lgtseek->{project}; }
+    Qsub_script( \%options );
+}
 
 ## Print the script call
 print_call( \%options );
@@ -103,31 +112,26 @@ print_complete( \%options );
 
 sub help {
     die "Help: This script will take a blast-m8 report and calculate the LCA for each unique ID.
-	----------------------------------------------------------------------------------------------------
-		--input|i=			<Input> Accepts blast -m8 reports.
-		--input_list=			List of blast -m8 reports, 1 file per line.
-	----------------------------------------------------------------------------------------------------
-		--evalue_cutoff|e=		# For the highest evalue allowed.
-		--best_hits_only=		<0|1> [0] 1= Parse the blast hit for only best hits.
-		--combine_PE_lca=		<0|1> [0] 1= Merge both PE reads into 1 LCA with the conservative and liberal methods.
-	----------------------------------------------------------------------------------------------------
-		--output_dir|o=			Directory for all output. Will be created if it doesn't exist.
-		  --output_prefix=		Name of prefix for the output. 
-		  --subdirs=			<0|1> [0] 1 = Create a new subdirectory for each input in the output directory.
-	----------------------------------------------------------------------------------------------------
-		--Qsub|q=			<0|1> [0] 1 = Submit the job to the grid.
-		  --sub_name=  			Name of the job to submit.
-		  --project=			[jdhotopp-lab] Grid project to use.
-		  --sub_mail=           [0] 1= email user\@som.umaryland.edu when job is complete & with stats. Can also specify --sub_mail=specific\@email.foo
-	----------------------------------------------------------------------------------------------------	
-		--conf_file=			[/home/USER/.lgtseek.conf]
-		--taxon_host=			[mongotest1-lx.igs.umaryland.edu:10001]
-		--taxon_dir=			[/local/db/repository/ncbi/blast/20120414_001321/taxonomy/]
-		--taxon_idx_dir=		[/local/projects-t3/HLGT/idx_dir/20120414]
-	----------------------------------------------------------------------------------------------------	
-		--verbose|V			<0|1> [1] 1= Verbose reporting of progress. 0 =Turns off reports.
-		--print_hostname|ph= 		<0|1> [1] Print hostname. Defaults to 1 if verbose=1. 
-		--help
-	----------------------------------------------------------------------------------------------------\n";
+    ----------------------------------------------------------------------------------------------------
+        --input|i=              <Input> Accepts blast -m8 reports.
+        --input_list=           List of blast -m8 reports, 1 file per line.
+    ----------------------------------------------------------------------------------------------------
+        --evalue_cutoff|e=      # For the highest evalue allowed.
+        --best_hits_only=       <0|1> [0] 1= Parse the blast hit for only best hits.
+        --combine_PE_lca=       <0|1> [0] 1= Merge both PE reads into 1 LCA with the conservative and liberal methods.
+    ----------------------------------------------------------------------------------------------------
+        --output_dir|o=         Directory for all output. Will be created if it doesn't exist.
+          --output_prefix=      Name of prefix for the output. 
+          --subdirs=            <0|1> [0] 1 = Create a new subdirectory for each input in the output directory.
+    ----------------------------------------------------------------------------------------------------
+        --Qsub|q=               <0|1> [0] 1 = Submit the job to the grid.
+          --sub_name=           Name of the job to submit.
+          --project=            [jdhotopp-lab] Grid project to use.
+          --sub_mail=           [0] 1= email user\@som.umaryland.edu when job is complete & with stats. Can also specify --sub_mail=specific\@email.foo
+    ----------------------------------------------------------------------------------------------------    
+        --conf_file=            [/home/USER/.lgtseek.conf] 
+        --verbose|V             <0|1> 1=Verbose reporting of progress. 0=Turns off most reports.
+        --help|?
+    ----------------------------------------------------------------------------------------------------\n";
 }
 

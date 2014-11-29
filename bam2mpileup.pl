@@ -7,7 +7,8 @@ use setup_input;
 use File::Basename;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
-my $results = GetOptions( \%options, 'input|i=s', 'input_list|I=s', 'sort=s', 'output_prefix|p=s', 'output_dir|o=s', 'Qsub|q=s', 'region=s', 'A=s', 'd=s', 'M_M=s', 'M_UM=s', 'help|?', 'ref=s', )
+my $results
+    = GetOptions( \%options, 'input|i=s', 'input_list|I=s', 'sort=s', 'threads|t=i', 'output_prefix|p=s', 'output_dir|o=s', 'Qsub|q=s', 'region=s', 'A=s', 'd=s', 'M_M=s', 'M_UM=s', 'help|?', 'ref=s', )
     or die "Error: Unrecognized command line option. Please try again.\n";
 
 if ( $options{help} ) {
@@ -63,8 +64,8 @@ foreach my $bam (@$input) {
     if ( $dir =~ /\w+/ ) { run_cmd("mkdir -p -m u=rwx,g=rwx,o= $dir"); }
     my $out = ( $dir =~ /w+/ ) ? "$dir$prefix" : $prefix;
     my $cmd;
-    if ( $sort == 1 && defined $options{region} ) { $cmd = "samtools sort -@ $threads -m $sort_mem -o $bam - | samtools view $view - $region | samtools mpileup $mpileup - > $out\.mpileup"; }
-    elsif ( $sort == 1 && !$options{region} ) { $cmd = "samtools sort -@ $threads -m $sort_mem -o $bam - | samtools mpileup $mpileup - > $out\.mpileup"; }
+    if    ( $sort == 1 && defined $options{region} ) { $cmd = "samtools sort -@ $threads -m $sort_mem -o $bam - | samtools view $view - $region | samtools mpileup $mpileup - > $out\.mpileup"; }
+    elsif ( $sort == 1 && !$options{region} )        { $cmd = "samtools sort -@ $threads -m $sort_mem -o $bam - | samtools mpileup $mpileup - > $out\.mpileup"; }
     elsif ( defined $options{region} || $options{MM} == 1 || $options{MU} == 1 ) { $cmd = "samtools view $view $bam $region | samtools mpileup $mpileup - > $out\.mpileup"; }
     else                                                                         { $cmd = "samtools mpileup $mpileup $bam > $out\.mpileup"; }
 

@@ -21,6 +21,7 @@ use print_call;
 use read_in_list;
 use bwa;
 use empty_chk;
+use linecount;
 use parse_flag;
 use LGTSeek;
 
@@ -31,20 +32,21 @@ my $results = GetOptions(
     'draw_ref2_region=s@', 'sort1=i',          'sort2=i',         'reads_list=s',   'n_num|n=s@',    'draw_nstring=i', 'fix_orientation=i', 'titrate_refs=i',
     'titrate_n_string=i',  'M_only=i',         'MM_only=i',       'anchor_bam1=i',  'png=i',         'svg=i',          'draw_stdev|d=i',    'draw_both|B=i',
     'picard_file|P=s',     'stdev|D=i',        'insert_size|I=i', 'image_length=i', 'image_width=i', 'pad_scale=i',    'output_dir|o=s',    'output_prefix|p=s',
-    'merged_ref_name=s',   'dedup=i',          'jsd=i',           'threads=i',      'Qsub=i',        'sub_mem=s',      'sub_name=s',        'number_of_reads=i',
-    'split_bam1_cov=i',    'split_bam2_cov=i', 'no_gal=i',        'alternative=s',  'help|?',        'min_cov=i',
+    'merged_ref_name=s',   'dedup=i',          'jsd=i',           'threads|t=i',    'Qsub=i',        'sub_mem=s',      'sub_name=s',        'number_of_reads=i',
+    'split_bam1_cov=i',    'split_bam2_cov=i', 'no_gal=i',        'alternative=s',  'help|?',        'min_cov=i',      'sub_mail=s',
 ) or die "Unrecognized command line option. Please try agian.\n";
 
 if ( $options{help} ) { &help; }    ## &help is @ the end of the script
 
 if ( !$options{input} || !$options{ref2} ) {
-    die "Error: You MUST pass ATLEAST the folowing arguements: --bam1=<lgt_bam> --ref2=<some.fa> Please try agian.\n";
+    die "Error: You MUST pass ATLEAST the folowing arguements: --bam1=<lgt_bam_aln_ref1> --ref2=<some.fa> Please try agian.\n";
 }
 if ( !$options{ref1} ) { $options{ref1} = "/local/projects-t3/HLGT/references/hg19/hg19.fa"; }
 
 if ( $options{jsd} && !$options{picard_file} ) {
     die "Error: You must pass --picard_file=<insert_size_picard_file> when you use --jsd=1. Please try again.\n";
 }
+if ( ( $options{draw_stdev} or $options{draw_nstring} ) and !$options{png} ) { $options{svg} = 1; }
 if ( $options{titrate_refs} || $options{draw_stdev} || $options{titrate_n_string} || $options{jsd} ) {
     if ( !$options{stdev} || !$options{insert_size} ) {
         if ( -e $options{picard_file} ) {
@@ -119,7 +121,7 @@ my $log = "$out_dir\/merge_2lgt_bams.log";
 run_cmd( "touch $log", $log );
 my $output_prefix = $options{output_prefix} ? $options{output_prefix} : $fn1;
 if ( $output_prefix =~ /(.+)\_psort$/ ) {
-    $output_prefix = $1;    ## Remove a trailing _psort form input prefix
+    $output_prefix = $1;    ## Remove a trailing _psort from input prefix
 }
 my $map_dir = "$out_dir/map_dir/";
 run_cmd( "mkdir -p $map_dir", $log );
@@ -155,12 +157,28 @@ if ( !$options{bam2} && $options{ref2} ) {
 my $sort1 = defined $options{sort1} ? $options{sort1} : "0";
 my $sort2 = defined $options{sort2} ? $options{sort2} : "0";
 
+# Cordinate sort we the option was passed
 if ( $sort1 == 1 ) {
     print STDERR "======== Position sort bam1 ========\n";
     run_cmd( "samtools sort -o $options{input} - | samtools view -b - > $map_dir/$fn1\_psort.bam", $map_log );
     run_cmd( "samtools index $map_dir/$fn1\_psort.bam",                                            $map_log );
     $options{input} = "$map_dir/$fn1\_psort.bam";
 }
+
+# Checking to make sure we have cordinate sorted input.
+else {
+    my $header       = run_cmd("samtools view -H $options{input}");
+    my @header_lines = split( /\n/, $header );
+    my $hd_line      = $header_lines[0];
+    if ( $hd_line !~ /SO\:coordinate/ ) {
+        my ( $fn, $path, $suf ) = fileparse( $options{input}, ( ".nsrt.bam", ".srt.bam", qr/\.[^\.]+/ ) );
+        run_cmd("samtools sort $options{input} $map_dir/$fn\.psrt");
+        run_cmd("samtools index $map_dir/$fn\.psrt.bam");
+        $options{input} = "$map_dir/$fn\.psrt.bam";
+        $options{input} =~ s/\/{2,}/\//g;
+    }
+}
+
 if ( $options{split_bam1_cov} == 1 ) {
     print STDERR "======== Parse regions of coverage for bam1 ========\n";
     @bam1_region_list = &bam2regions_of_coverage_v2(
@@ -169,8 +187,9 @@ if ( $options{split_bam1_cov} == 1 ) {
             min_cov => $options{min_cov},
         }
     );
+    print STDERR "==== split_bam1_regions:\n@bam1_region_list\n";
 }
-print STDERR "==== split_bam1_regions:\n@bam1_region_list\n";
+
 if ( $sort2 == 1 ) {
     print STDERR "======== Position sort bam2 ========\n";
     my ( $fn2, $path2, $suff2 ) = fileparse( $options{bam2}, qr/\.[^\.]+/ );
@@ -186,9 +205,8 @@ if ( $options{split_bam2_cov} == 1 ) {
             min_cov => $options{min_cov},
         }
     );
+    print STDERR "==== split_bam2_regions:\n@bam2_region_list\n";
 }
-
-print STDERR "==== split_bam2_regions:\n@bam2_region_list\n";
 
 my %reads;    ## Hash of desired read id's.
 if ( $options{reads_list} ) {
@@ -210,6 +228,7 @@ foreach my $bam1_region (@bam1_region_list) {
         else                 { $dir = $out_dir; }
         $dir =~ s/:/_/g;
         $dir =~ s/\|/_/g;
+        $dir =~ s/\/{2,}/\//g;
 
         run_cmd( "mkdir -p $dir", $log );
 
@@ -251,7 +270,7 @@ foreach my $bam1_region (@bam1_region_list) {
                 output_dir => "$dir/merged_bams/"
             }
         );
-        if ( $merged_bam->{empty} == 1 ) {
+        if ( ( defined $merged_bam->{empty} and $merged_bam->{empty} == 1 ) or $merged_bam->{count} <= 2 ) {
             print STDERR "*** Warning *** Merged_bam was empty, skipping region(s): $bam1_region | $bam2_region \n";
             run_cmd( "rm -rf $dir", $log );
             next;
@@ -430,6 +449,9 @@ sub pull_bam_data {
     my @header = `samtools view -H $opts->{bam} 2>>$opts->{log}`
         or confess "Error: Couldn't get the samtools header from: $opts->{bam}\n";
     delete $header[-1];
+    foreach my $header_lines (@header) {
+        if ( $header_lines =~ /^\@HD/ ) { $header_lines =~ s/coordinate/queryname/; }
+    }
 
     my $open_cmd
         = defined $opts->{bam_region}
@@ -459,16 +481,13 @@ sub pull_bam_data {
 
 =head1
 
-Title   : pull_bam_data
-Usage   : my $bam_data = pull_bam_data($bam,$region);
-Function: Extract the reads from a specific bam region and return them in an array. 
+Title   : merge_bams
+Usage   : 
+Function:  
 Args    : 
-        bam1        => bam1_data_object,
-        bam2        => bam2_data_object,
-        output_dir  => '/output/dir/',
-        log         => '/path/to/log.txt'
         
-Returns : Returns the path to the new bam with merged id's. 
+        
+Returns : 
 
 =cut
 
@@ -478,6 +497,9 @@ sub merge_bams {
     my $bam2_data = $opts->{bam2_data};
     run_cmd( "mkdir -p $opts->{output_dir}", $log );
 
+    # print STDERR "bam1: " . Dumper($bam1_data) . "\n";
+    # print STDERR "bam2: " . Dumper($bam2_data) . "\n";
+
     # Grab ID's present & mapping in both
     my $merged_ids = &merge_hash_ids( [ $bam1_data->{id_hash}, $bam2_data->{id_hash} ] );
 
@@ -485,7 +507,11 @@ sub merge_bams {
     open( SAM, ">", "$opts->{output_dir}\/Merged-reads-only.sam" )
         or confess "Error: Couldn't open output merged.sam: $opts->{output_dir}/Merged-reads-only.sam";
     print SAM @{ $bam1_data->{header} };
-    print SAM @{ $bam2_data->{header} } if ( $opts->{bam2_data} );
+    if ( $opts->{bam2_data} ) {
+        foreach my $header_lines ( @{ $bam2_data->{header} } ) {
+            if ( $header_lines !~ /^\@HD/ ) { print SAM $header_lines; }
+        }
+    }
 
     my $bam1_orientation = 0;
     my $bam2_orientation = 0;
@@ -530,20 +556,24 @@ sub merge_bams {
                 dedup        => "1",
             }
         );
-        ## Remove bad id's from ID Hash
-        open( BAD, "<", "$opts->{output_dir}/Merged-reads-only_prinseq-bad-ids.out" )
-            || confess "Error: Unable to open bad id's file: $opts->{output_dir}/Merged-reads-only_prinseq-bad-ids.out\n";
-        while (<BAD>) {
-            chomp;
-            delete $merged_ids->{$_};
-        }
-        close BAD;
         $ret_bam = $filtered_bam->{bam};
+
+        run_cmd("samtools view $ret_bam | cut -f1 | sort -u > $opts->{output_dir}\/Post_dedup_good_ids.list");
+        my $good_ids_hash = $lgtseek->_read_ids( { list => "$opts->{output_dir}\/Post_dedup_good_ids.list" } );
+        run_cmd("rm $opts->{output_dir}\/Post_dedup_good_ids.list");
+
+        foreach my $id ( keys %$merged_ids ) {
+            if ( !$good_ids_hash->{$id} ) { delete $merged_ids->{$id}; }
+        }
     }
+
+    # Check to make sure we have reads in the merged bam.
+    my $count = wc($ret_bam);
 
     return {
         file        => $ret_bam,
         ids         => $merged_ids,
+        count       => $count,
         bam1_strand => $bam1_orientation,
         bam2_strand => $bam2_orientation,
     };
@@ -555,8 +585,8 @@ Title   : pull_ref_data
 Usage   : my $ref_data_list = pull_ref_data($bam_data_in_array,@draw_ref_region_list);
 Function: Extract the reference sequence from a specific fasta region for all ref_regions
 Args    : 
-        ref         =>  <file>                        {Mandatory}{Priority}
-        ref_region  =>  <@array_ref>      {Optional}{Priority}
+        ref         =>  <file>              {Mandatory}{Priority}
+        ref_region  =>  <@array_ref>        {Optional} {Priority}
         bam_data    =>  <object>            {Mandatory}
         merged_ids  =>  <hash>              {Mandatory}
 Returns : array_of_hashes{'seq' => ref_seq_string, 'range' => 'actual_chr:100-200'}
@@ -855,7 +885,7 @@ sub optimize_refs {
     my %pop_count;
     if ( $jsd == 1 ) {
         open( PIC, "<", "$opts->{picard_file}" )
-            or confess "Error: unable to open picard_file for reading: $options{picard_file}\n";
+            or confess "Error: Unable to open picard_file for reading: $options{picard_file}\n";
         my @header              = <PIC> . <PIC> . <PIC> . <PIC> . <PIC> . <PIC> . <PIC>;
         my @picard_insert_sizes = <PIC> . <PIC> . <PIC>;
         my $foobar              = <PIC> . <PIC> . <PIC>;
@@ -1423,9 +1453,20 @@ sub find_key_with_min_hash_value {
 
 sub bam2regions_of_coverage_v2 {
     my $opts            = shift;
-    my $max_window_size = defined( $opts->{max_window_size} ) ? $opts->{max_window_size} : "100";
+    my $max_window_size = defined( $opts->{max_window_size} ) ? $opts->{max_window_size} : "30";
     my $window          = {};
     my @ret_region_list;
+
+    my $header       = run_cmd("samtools view -H $opts->{bam}");
+    my @header_lines = split( /\n/, $header );
+    my $hd_line      = $header_lines[0];
+    if ( $hd_line !~ /SO\:coordinate/ ) {
+        my ( $fn, $path, $suf ) = fileparse( $opts->{bam}, ( ".nsrt.bam", ".srt.bam", qr/\.[^\.]+/ ) );    ## FOOBAR
+        run_cmd("samtools sort $opts->{bam} $map_dir/$fn\.psrt");
+        run_cmd("samtools index $map_dir/$fn\.psrt.bam");
+        $opts->{bam} = "$map_dir/$fn\.psrt.bam";
+        $opts->{bam} =~ s/\/{2,}/\//g;
+    }
 
     open( my $infh, "-|", "samtools mpileup -f $opts->{ref} -A $opts->{bam}" )
         or confess "ERROR: Can't open: samtools mpileup $opts->{ref} -A $opts->{bam}\n";
@@ -1526,15 +1567,15 @@ sub help {
     --n_num|n=              Number of \"N's\" to insert inbetween merged references. [0] May also take comma delimited list or multiple entries. 
     --draw_nstring=         <0|1> [0] 1= Draw the n-string \"contig\".
     ------------------------------------------------------------------------------------------------------------------------------------------------------------
-    --png=                  <0|1> [0] 1=Create a png img of the merged bam.
-    --svg=                  <0|1> [0] 1=Create a svg img of the merged bam.
+    --png=                  <0|1> [0] 1= Create a png img of the merged bam.
+    --svg=                  <0|1> [0] 1= Create a svg img of the merged bam.
       --image_length=       Ajust the length of the png created.
       --image_width=        Adjust the width of the png created. 
       --pad_scale=          Pad white space around img. 
     ------------------------------------------------------------------------------------------------------------------------------------------------------------
     --draw_both|B=          <0|1> [0] 1= Draw both a \"normal\" & stdev color coded img.
-    --draw_stdev|d=         <0|1> [0] 1=Color code the reads based on variance from STDEV of insert size;
-                                +/- STDEV * .5=Green ; 1=Dark Blue/Red ; 2=Light Blue/Orange
+    --draw_stdev|d=         <0|1> [0] 1= Color code the reads based on # of STDEV from the median insert size;
+                                +/- STDEV * 0.5=Light Red/Green ; 1=Red/Green ; 2=Dark Red/Green
     --insert_size|I=        < # > 
     --stdev|D=              < # >
     --picard_file|P=        < /path/to/file.txt > Picard insert metrics file. Must be used if --stdev && --insert_size are not used or if jsd is calculated.

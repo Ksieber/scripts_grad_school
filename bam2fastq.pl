@@ -18,7 +18,7 @@ if ( $options{help} ) {
     _____________________________________________________________________________________________ 
     --input|i=                <input.bam>, or use ARGV[0], or read STDIN. Must use FULL file path names for Qsub.
       --name_sort=            <0|1> [0] 1=Sort the input bam by names first. Must be name sorted otherwise.
-      --sort_mem=             [5G] Amount of mem / thread to use for name sorting.
+      --sort_mem=             [1G] Amount of mem / thread to use for name sorting.
       --threads|t=              [1] # of threads to use for name sorting.
     _____________________________________________________________________________________________
     --fasta=                <0|1> [0] 0=Fastq. 1=fasta
@@ -31,7 +31,7 @@ if ( $options{help} ) {
       --subdirs=              <0|1> [0] 1= Make subdirectory to work from. 
     _____________________________________________________________________________________________ 
     --Qsub|q=                 <0|1> [0] 1= Qsub. Must use FULL file path names for Qsub.
-      --sub_mem=              [6G] Must reflect changes in --sort_mem.
+      --sub_mem=              [1G] Must reflect changes in --sort_mem.
     --help|?
     _____________________________________________________________________________________________\n";
 }
@@ -39,7 +39,7 @@ if ( $options{help} ) {
 if ( !$ARGV[0] && !$options{input} && $options{Qsub} == 1 )      { die "Must give an input bam with ARGV[0] or --bam=<input.bam> when submitting to the grid.\n"; }
 if ( !$ARGV[0] && !$options{input} && $options{name_sort} == 1 ) { die "Must give an input bam with ARGV[0] or --bam=<input.bam> when name_sort=1.\n"; }
 
-my $sub_mem = $options{sub_mem} ? $options{sub_mem} : "6G";
+my $sub_mem = $options{sub_mem} ? $options{sub_mem} : "1G";
 $options{input} = defined $options{input} ? $options{input} : $ARGV[0];
 my $in = ( -e $options{input} ) ? $options{input} : "<STDIN>";
 my ( $fn, $path, $suf ) = ( -e $in ) ? fileparse( $in, ( '.srt.bam', '_\w+_sort.bam', '.sort.bam', '.bam' ) ) : ( "bam2fastq", "./", ".fa" );

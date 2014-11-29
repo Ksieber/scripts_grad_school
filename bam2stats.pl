@@ -5,20 +5,23 @@ use Time::SoFar;
 use File::Basename;
 use LGTSeek;
 use run_cmd;
+use mk_dir;
 use setup_input;
 use lib '/local/projects-t3/HLGT/scripts/lgtseek/lib/';
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 our %options;
-our $results = GetOptions( \%options, 'input|i=s', 'input_list|I=s', 'output_dir|o=s', 'subdirs=s', 'append=s', 'Qsub|q=s', 'help|?' ) or die "Unrecognized command line option. Please try agian.\n";
+our $results = GetOptions( \%options, 'input|i=s', 'input_list|I=s', 'output_dir|o=s', 'subdirs=s', 'append=s', 'Qsub|q=s', 'sub_mem=s', 'sub_wd=s', 'help|?' )
+    or die "Unrecognized command line option. Please try agian.\n";
 
 if ( $options{help} ) {
     die "This script will calculate the number of reads in a bam: Total, MM, MU, UU, SC
-    --input|i=            <BAM> (Also accepts single bam from \$ARGV[0])
-    --input_list|I=       <list of BAMS>
-    --append=           </path/file/append.txt> Add output stats to this file.
-    --output_dir|o=       </path/for/output/>
-    --subdirs=          <0|1> [0] 1= Put output into a subdirectory under --output_dir.
-    --Qsub|q=             <0|1> [0] 1= Qsub the script. 
+    --input|i=              <BAM> (Also accepts single bam from \$ARGV[0])
+    --input_list|I=         <list of BAMS>
+    --append=               </path/file/append.txt> Add output stats to this file.
+    --output_dir|o=         </path/for/output/>
+    --subdirs=              <0|1> [0] 1= Put output into a subdirectory under --output_dir.
+    --Qsub|q=               <0|1> [0] 1= Qsub the script.
+    --sub_wd=               [--output_dir] /dir/for/qsub.e# files 
     --help|?\n";
 }
 
@@ -52,12 +55,16 @@ foreach my $input (@$input) {
         else {
             $output_dir = run_cmd("pwd");
         }
+        mk_dir($output_dir);
+        my $wd_dir = defined $options{sub_wd} ? $options{sub_wd} : $output_dir;
+        mk_dir($wd_dir);
+
         ## submit command to grid
         Qsub(
             {   cmd      => "$cmd",
                 sub_name => "bam2stats",
                 sub_mem  => "1G",
-                wd       => "$output_dir",
+                wd       => $wd_dir,
             }
         );
         ## Skip to next input for qsub

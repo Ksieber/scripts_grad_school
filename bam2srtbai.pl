@@ -48,7 +48,7 @@ if ( $Qsub == 1 ) {
     }
     Qsub(
         {   cmd      => "$sub",
-            mem      => "$sort_mem",
+            sub_mem  => "$sort_mem",
             wd       => "$dir",
             sub_name => "sortBAM",
             threads  => "$threads",

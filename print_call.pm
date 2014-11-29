@@ -7,7 +7,7 @@ our @EXPORT = qw( print_call print_complete print_hostname print_notebook );
 
 =head2 print_call
     Title       : print_call
-    Usage       : print_call(\%options);
+    Usage       : print_call(\%options,"other comments", "to also print", "like version number");
     Function    : Print STDERR original perl script & --options with it
     Args        : Hash ref
 =cut 
@@ -19,21 +19,29 @@ sub print_call {
     foreach my $key ( sort keys %$options ) {
         if ( $options->{$key} ) { print STDERR " --$key=$options->{$key}" }
     }
+    if ( defined @_ and scalar(@_) >= 1 ) {
+        foreach my $comment (@_) {
+            print STDERR "\n$comment";
+        }
+    }
     print STDERR "\n================================================================================================================================\n";
 }
 
 sub print_complete {
     my $options = shift;
     print STDERR "================================================================================================================================\n";
-    if    ( $options->{input} )      { print STDERR "++++++++++ COMPLETED:\t$0 on: $options->{input}\t\t++++++++++\n"; }
-    elsif ( $options->{input_list} ) { print STDERR "++++++++++ COMPLETED:\t$0 on: $options->{input_list}\t\t++++++++++\n"; }
-    else                             { print STDERR "++++++++++ COMPLETED:\t$0\n"; }
-    print STDERR "--------------------------------------------------------------------------------------------------------------------------------\n";
     print STDERR "$0";
     foreach my $key ( sort keys %$options ) {
         if ( $options->{$key} ) { print STDERR " --$key=$options->{$key}" }
     }
-    print STDERR "\n================================================================================================================================\n";
+    if ( defined @_ and scalar(@_) >= 1 ) {
+        foreach my $comment (@_) {
+            print STDERR "\n$comment";
+        }
+    }
+    print STDERR "\n--------------------------------------------------------------------------------------------------------------------------------\n";
+    print STDERR "++++++++++ COMPLETED:\t$0\t:++++++++++\n";
+    print STDERR "================================================================================================================================\n";
 }
 
 sub print_hostname {
@@ -56,6 +64,11 @@ sub print_notebook {
     print OUT "$0";
     foreach my $key ( sort keys %$options ) {
         if ( $options->{$key} ) { print OUT " --$key=$options->{$key}" }
+    }
+    if ( defined @_ and scalar(@_) >= 1 ) {
+        foreach my $comment (@_) {
+            print OUT "\n$comment";
+        }
     }
     print OUT "\n";
     close OUT;

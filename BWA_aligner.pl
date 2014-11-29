@@ -8,7 +8,7 @@ use POSIX;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 our %options;
 our $results = GetOptions(
-    \%options,     'input|i=s',    'input_list=s', 'output_prefix=s',     'output_dir|o=s', 'subdirs=s',    'ref|r=s',          'ref_list=s',
+    \%options,     'input|i=s',    'input_list=s', 'output_prefix|p=s',   'output_dir|o=s', 'subdirs=s',    'ref|r=s',          'ref_list=s',
     'threads|t=s', 'disable_SW=s', 'bam_output=s', 'sort_index_output=s', 'mpileup=s',      'no_cleanup=s', 'insert_metrics=s', 'mapped_only=s',
     'cmd_log=s',   'Qsub|q=i',     'name=s',       'project=s',           'sub_mem=s',      'help|h',       'help_full|?',      'name_sort_input=i',
     'sort_mem=s',  'sub_mail=s',
@@ -95,9 +95,10 @@ foreach my $files (@$input) {
             Qsub(
                 {   cmd      => "$cmd",
                     threads  => "$threads",
-                    mem      => "$sub_mem",
-                    wd       => "$options{output_dir}",
+                    sub_mem  => "$sub_mem",
                     sub_name => $job_name,
+                    sub_mail => $options{sub_mail},
+                    wd       => "$options{output_dir}",
                     project  => "$project",
                 }
             );
@@ -112,7 +113,7 @@ foreach my $files (@$input) {
 ## BWA alignment
 sub bwa_align {
     my ( $files, $ref ) = @_;
-    print "@_\n";
+    # print "@_\n";
     my ( $ref_name, $ref_path, $ref_suf ) = fileparse( $ref, @ref_suffix_list );    ## Grab the reference name to use for the naming the output
     my $file1;                                                                      ## Global input file name
     my $file2;                                                                      ## Global input file name2

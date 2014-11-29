@@ -35,7 +35,7 @@ foreach my $input (@$inputs) {
     my $xml = "$output_dir/cgquery.xml";
 
     # First, pull cgquery xml file from cghub
-    my $cmd              = "/home/ksieber/bin/cgquery \"analysis_id\=$analysis_id\" -o $xml";
+    my $cmd              = "/home/ksieber/lib/Python-2.7.7/bin/python2.7 /home/ksieber/bin/cgquery \"analysis_id\=$analysis_id\" -o $xml";
     my $cgquery_retry    = 1;
     my $cgquery_attempts = 0;
     my $retry_pause      = 3;

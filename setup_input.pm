@@ -19,11 +19,11 @@ sub setup_input {
         push( @inputList, $options->{input} );
     }
     if ( $options->{input_list} ) {
-        if ( -e $options->{input_list} ) {
-            push( @inputList, @{ &read_in_list( $options->{input_list} ) } );
-        }
-        else {
+        if ( !( -e $options->{input_list} ) and $options->{input_list} =~ /\,+/ ) {
             push( @inputList, split( /,/, join( ',', $options->{input_list} ) ) );
+        }
+        elsif ( -e $options->{input_list} ) {
+            push( @inputList, @{ &read_in_list( $options->{input_list} ) } );
         }
     }
     return \@inputList;

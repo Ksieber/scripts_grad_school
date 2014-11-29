@@ -30,26 +30,19 @@ use LGTSeek;
 use File::Basename;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
-my $results = GetOptions (\%options,
-                          'taxon_host=s', # Comma separated list of files
-                          'taxon_dir=s',
-                          'port=s',
-                          'taxon_idx_dir=s',
-                          );
+my $results = GetOptions(
+    \%options,
+    'taxon_host=s',    # Comma separated list of files
+    'taxon_dir=s',
+    'port=s',
+    'taxon_idx_dir=s',
+);
 
-my $port=$options{port} ? $options{port} : 10001;
-my $lgtseek = LGTSeek->new2({
-        options => \%options
-        });
+my $port = $options{port} ? $options{port} : 10001;
+my $lgtseek = LGTSeek->new2( { \%options } );
 
 print STDERR "Here with taxon_host: $lgtseek->{taxon_host}\:$lgtseek->{port}.\n";
-# Create an lgtseek object
-#my $lgtseek = LGTSeek->new({
-#    taxon_dir => $options{taxon_dir},
-#    taxon_host => $options{dbhost}.":$port",
-#    chunk_size => '500000',
-#    taxon_idx_dir => $options{taxon_idx_dir}, 
-#});
 
 my $gi2tax = $lgtseek->getGiTaxon();
+
 # OK, hopefully that worked.

@@ -27,9 +27,9 @@ use strict;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
 my $results = GetOptions(
-    \%options,             'fasta|f=s',            'bam|b=s',        'db=s',               'formatdb=i', 'm8=i',
-    'evalue_cutoff=s',     'best_hits_only|bho=i', 'output_dir|o=s', 'output_prefix|op=s', 'Qsub|q=i',   'sub_name=s',
-    'print_hostname|ph=i', 'subdirs=i',            'threads|t=i',    'conf_file=s',        'verbose=i',  'help|?',
+    \%options,        'fasta|f=s',          'bam|b=s',    'db=s',       'formatdb=i',          'm8=i',      'evalue_cutoff=s', 'best_hits_only|bho=i',
+    'output_dir|o=s', 'output_prefix|op=s', 'Qsub|q=i',   'sub_name=s', 'print_hostname|ph=i', 'subdirs=i', 'threads|t=i',     'conf_file=s',
+    'verbose=i',      'help|?',             'sub_mail=s', 'sub_mem=s',
 ) or die "Error: Unrecognized command line option. Please try again.\n";
 
 use lib ( "/local/projects-t3/HLGT/scripts/lgtseek/lib/", "/local/projects/ergatis/package-driley/lib/perl5/x86_64-linux-thread-multi/" );
@@ -79,6 +79,7 @@ if ( $options{formatdb} ) {
 
 # Convert Bam -> Fasta for Blast
 my $fasta = defined $options{bam} ? $lgtseek->sam2Fasta( { input => $options{bam}, output_dir => $lgtseek->{output_dir} } ) : $options{fasta};
+my $blast_db = defined $options{db} ? $options{db} : $lgtseek->{path_to_blastdb};
 
 my $evalue_cutoff = defined $options{evalue_cutoff}  ? $options{evalue_cutoff} : '1';
 my $m8            = defined $options{m8}             ? $options{m8}            : '0';
@@ -87,8 +88,8 @@ my $bho           = defined $options{best_hits_only} ? '1'                     :
 if ( $m8 == 1 ) {
 
     # Run Blast
-    open( IN, "blastall -p blastn -a $lgtseek->{threads} -e $evalue_cutoff -T F -d $options{db} -m8 -i $fasta |" )
-        || confess "Error: Unable to start blast fh: blastall -p blastn -a $lgtseek->{threads} -e 1 -T F -d $options{db} -m8 -i $fasta\n";
+    open( IN, "blastall -p blastn -a $lgtseek->{threads} -e $evalue_cutoff -T F -d $blast_db -m8 -i $fasta |" )
+        or confess "Error: Unable to start blast fh: blastall -p blastn -a $lgtseek->{threads} -e 1 -T F -d $options{db} -m8 -i $fasta\n";
     open( OUT, ">$lgtseek->{output_dir}/$output_prefix\-m8.txt" ) or confess "Error: Unable to open output file: $lgtseek->{output_dir}/$output_prefix\-m8.txt\n";
 
     my $last_id = 'foo';
@@ -151,19 +152,20 @@ sub help {
         --fasta|f=              <FASTA> File to blastn against the db. 
         --bam|b=                <BAM>  File to blastn against the db. 
     ----------------------------------------------------------------------------------------------------
-        --db|d=                 <FastaDB> Fasta reference file to blastn against. 
+        --db|d=                 <FastaDB> Fasta reference file to blastn against.       [/local/db/repository/ncbi/blast/20120414_001321/nt/nt]
         --formatdb=             <0|1> [0] 1= Build the blast database to blast again. 
     ----------------------------------------------------------------------------------------------------
         --output_dir|o=         Directory for all output. Will be created if it doesn't exist.
           --output_prefix|op=   Name of prefix for the output. 
           --subdirs=            <0|1> [0] 1 = Create a new subdirectory for each input in the output directory.
         --evalue_cutoff =       [1] Max Evalue allowed. Example: 1e-5
-        --best_hits_only|bho =  <0|1> [0] 1=Only keep best hits.
+        --best_hits_only|bho =  <0|1> [0] 1= Only keep best hits.
         --m8=                   <0|1> [1] 1= Output blast -m8 format. 0= \"Normal\" blast output.
     ----------------------------------------------------------------------------------------------------
         --Qsub|q=               <0|1> [0] 1 = Submit the job to the grid.
           --threads=            [1] Threads to sort and blast with.
           --sub_name=           Name of the job to submit.
+          --sub_mem=            [4G]
           --project=            [jdhotopp-lab] Grid project to use.
     ----------------------------------------------------------------------------------------------------    
         --conf_file=            [/home/USER/.lgtseek.conf]

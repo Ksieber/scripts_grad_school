@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 use Bio::SeqIO;
-
+# foobar
 my $gb_file = "/local/projects-t3/HLGT/TCGA/ksieber_dir/COAD/SRP009542/jdh_work/references/NC_003454-Fusobacterium_nucleatum.gb";
 my $stream = Bio::SeqIO->new(-file => $gb_file,
 							-format => 'GenBank');

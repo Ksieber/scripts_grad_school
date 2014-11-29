@@ -37,7 +37,7 @@ use run_cmd;
 use print_call;
 
 my %options;
-my $results = GetOptions( \%options, 'input=s', 'input_list=s', 'output_dir=s', 'threads=i', 'rate_limit=s', 'cghub_key=s', 'Qsub=i', 'help|?', 'verbose=i', 'Qsub_iterate=i', )
+my $results = GetOptions( \%options, 'input=s', 'input_list=s', 'output_dir=s', 'threads=i', 'rate_limit=s', 'cghub_key=s', 'Qsub=i', 'sub_mail=s', 'help|?', 'verbose=i', 'Qsub_iterate=i', )
     or die "Error: Unrecognized command line option. Please try again.\n";
 
 if ( $options{help} ) {
@@ -59,20 +59,6 @@ if ( !$options{output_dir} ) { die "Must give use --output_dir=\"/dir/for/output
 if ( $options{Qsub} or $options{Qsub_iterate} ) { Qsub_script( \%options ) }
 
 my $lgtseq = LGTSeek->new2( \%options );
-
-# if ( $options{Qsub} ) {
-#     $options{sub_name} = defined $options{sub_name} ? $options{sub_name} : "CGHub-DL";
-#     my $cmd = "$^X $0 --output_dir=$options{output_dir} --rate_limit=$lgtseq->{rate_limit} --cghub_key=$lgtseq->{cghub_key} --threads=$lgtseq->{threads}";
-#     if ( $options{input} ) {
-#         $cmd = $cmd . " --input=$options{input}";
-#     }
-#     elsif ( $options{input_list} ) {
-#         $cmd = $cmd . " --input_list=$options{input_list}";
-#     }
-#     Qsub( { cmd => $cmd, threads => $lgtseq->{threads}, sub_name => $options{sub_name} } );
-#     sleep 10;
-#     exit;
-# }
 
 print_call( \%options );
 

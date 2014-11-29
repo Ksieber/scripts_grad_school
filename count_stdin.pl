@@ -4,7 +4,12 @@ use strict;
 
 my $num = 0;
 while (<>) {
-	$num=$num+$_;
+    if ( $_ =~ /\w+\s{1}\:\s{1}(\d+)$/ ) {
+        $num += $1;
+    }
+    else {
+        $num += $_;
+    }
 }
 
 print "$num\n";
