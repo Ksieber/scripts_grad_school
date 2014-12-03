@@ -1,5 +1,5 @@
 #!/usr/bin/perl -I /home/ksieber/perl5/lib/perl5/ -I /home/ksieber/scripts/
-my $VERSION = "2.00";
+my $VERSION = "2.01";
 use warnings;
 use strict;
 use Carp;
@@ -20,35 +20,60 @@ use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
 my $results = GetOptions(
     \%options,     'lgt_ref|i=s', 'input|i=s',   'read_length=i', 'iterate=i', 'reads=s',      'output_dir|o=s', 'output_prefix|p=s', 'ref=s', 'subdirs=i',
-    'threads|t=i', 'Qsub|q=i',    'wgsim_bin=s', 'help|?',        'chr1=s',    'ref1_start=i', 'sub_name=s',
+    'threads|t=i', 'Qsub|q=i',    'wgsim_bin=s', 'help|?',        'chr1=s',    'ref1_start=i', 'sub_name=s',     'project=s',
 ) or die "Unrecognized command line option. Please try agian.\n";
 
 if ( $options{help} ) { &help; }
 
 # Check to make sure we have all the options we will need
-if ( !$options{input} ) { die "Error: Must pass a --input=<Picard File> Please try again.\n"; }
+if ( !$options{input} ) { die "Error: Must pass a --input=<Picard File>. Please try again.\n"; }
 if ( !$options{reads} ) { die "Error: Must pass a --reads= number of random reads to generate to model JSD. Please try again\n"; }
-if ( !$options{ref} and !$options{lgt_ref} ) { die "Error: Must pass a ref with --ref=standard ref. or --lgt_ref=merge2lgtbam.fa. Please try again.\n"; }
+if ( !$options{ref} and !$options{lgt_ref} ) { die "Error: Must pass a ref with --ref=standard.fa. or --lgt_ref=merge2lgtbam.fa. Please try again.\n"; }
+if ( !$options{sub_name} ) { $options{sub_name} = "jsdCalc"; }
+if ( !$options{project} )  { $options{project}  = "jdhotopp-lab"; }
 
-# Sumbit the job to the grid
-if ( defined $options{Qsub} and $options{Qsub} == 1 ) {
-    if ( !$options{sub_name} ) { $options{sub_name} = "jsdCalc"; }
-    Qsub_script( \%options );
-}
-
-# Set default and global variables
-my @reads_number_to_process = -e $options{reads}            ? @{ &read_in_list( $options{reads} ) } : split( /,/, join( ',', $options{reads} ) );
-my $wgsim                   = defined $options{wgsim_bin}   ? $options{wgsim_bin}                   : "/home/ksieber/bin/wgsim";
-my $read_length             = defined $options{read_length} ? $options{read_length}                 : "51";
-my $iterate                 = defined $options{iterate}     ? $options{iterate}                     : "1000";
-my $threads                 = defined $options{threads}     ? $options{threads}                     : "8";
-my $ref1                    = $options{ref};
+# Set default and global variables so we can Qsub (if --Qsub=1)
+my @reads_number_to_process = -e $options{reads} ? @{ &read_in_list( $options{reads} ) } : split( /,/, join( ',', $options{reads} ) );
 my ( $fn, $path, $suf ) = fileparse( $options{input}, ( ".std_insert.metrics", ".metrics", ".txt", qr/\.[^\.]+/ ) );
 my $overall_output_dir = defined $options{output_dir}    ? $options{output_dir}    : $path;
 my $output_prefix      = defined $options{output_prefix} ? $options{output_prefix} : $fn;
 if ( defined $options{subdirs} and $options{subdirs} == 1 ) { $overall_output_dir = "$overall_output_dir/$output_prefix/"; }
 mk_dir("$overall_output_dir");
-print_notebook( \%options );
+
+# Sumbit the job to the grid
+if ( defined $options{Qsub} and $options{Qsub} == 1 ) {
+    my $first_sub = 1;
+    foreach my $number_of_reads (@reads_number_to_process) {
+        my $cmd = "$^X $0";
+        $cmd = $cmd . " --reads=$number_of_reads";
+        foreach my $key ( keys %options ) {
+            next if ( $key eq 'Qsub' );
+            next if ( $key eq 'reads' );
+            if ( defined $options{$key} ) { $cmd = $cmd . " --$key=$options{$key}" }
+        }
+        Qsub(
+            {   cmd      => $cmd,
+                wd       => $overall_output_dir,
+                sub_name => $options{sub_name},
+                threads  => $options{threads},
+                project  => $options{project},
+            }
+        );
+        sleep 10 if ( $first_sub == 1 );        # pause to let the first script generate the fasta ref for other subs to use. 
+        $first_sub++;
+    }
+    die "+++ Finished submitting the jobs to the grid. +++\n";
+}
+
+# Set default and global variables
+my $wgsim       = defined $options{wgsim_bin}   ? $options{wgsim_bin}   : "/home/ksieber/bin/wgsim";
+my $read_length = defined $options{read_length} ? $options{read_length} : "51";
+my $iterate     = defined $options{iterate}     ? $options{iterate}     : "1000";
+my $threads     = defined $options{threads}     ? $options{threads}     : "8";
+my $ref1        = $options{ref};
+
+## Start processing
+print_notebook( \%options, "Version: $VERSION" );
 
 # First, get the insert size and deviation of the library from the Picard file.
 my $insert_size;
@@ -63,8 +88,8 @@ my @jsd_ci_min_values;
 my @jsd_ci_max_values;
 my $n = 1;
 
-my $generated_ref = &generate_standard_ref( $overall_output_dir, $ref1 ) if ( $options{ref} and !$options{lgt_ref} );
-my ( $lgt_ref1, $lgt_ref2 ) = &generate_lgt_refs( $overall_output_dir, $options{lgt_ref}, $ref1, $options{ref2} ) if ( defined $options{lgt_ref} and -e $options{lgt_ref} );
+my $generated_ref = &generate_standard_ref( $overall_output_dir, $ref1 ) if ( defined $options{ref} and !$options{lgt_ref} );
+my ( $lgt_ref1, $lgt_ref2 ) = &generate_lgt_refs( $overall_output_dir, $options{lgt_ref}, $ref1, $options{ref2} ) if ( defined $options{lgt_ref} and !$options{ref} );
 
 foreach my $number_of_reads (@reads_number_to_process) {
     my $subdir_name = "$number_of_reads\_reads";
@@ -73,10 +98,9 @@ foreach my $number_of_reads (@reads_number_to_process) {
     open( my $OUT, ">", "$output_dir/JSD_values_conf-intrvls.txt" );
     print $OUT "\# titrate_jsd_random_reads_from_INT.pl\tVersion:$VERSION\n";
     print $OUT "\# iterate=$iterate\treads=" . join( ",", @reads_number_to_process ) . "\n";
-    print $OUT "\# Picard_input=$options{input}";
-    if ( defined $options{ref} )     { print $OUT "\tref1=$ref1"; }
-    if ( defined $options{lgt_ref} ) { print $OUT "\tlgt_ref=$options{lgt_ref}"; }
-    print $OUT "\n";
+    print $OUT "\# Picard_input=$options{input}\n";
+    if ( defined $options{ref} )     { print $OUT "# ref1=$ref1\n"; }
+    if ( defined $options{lgt_ref} ) { print $OUT "# lgt_ref=$options{lgt_ref}\n"; }
 
     # Second, start iterating for [--iterate] number of times for each $number_of_reads
     for ( $n = 1; $n <= $iterate; $n++ ) {
@@ -196,12 +220,13 @@ foreach my $number_of_reads (@reads_number_to_process) {
     &print_summary_stats( $TXT, "JSD_ci-max", \@jsd_ci_max_values );
     close $TXT;
 }
-if ( defined $options{lgt_ref} and -e $options{lgt_ref} ) {
-    run_cmd("rm $lgt_ref1 $lgt_ref2");
-}
-else {
-    run_cmd("rm $generated_ref");
-}
+
+# if ( defined $options{lgt_ref} and -e $options{lgt_ref} ) {
+#     run_cmd("rm $lgt_ref1 $lgt_ref2");
+# }
+# else {
+#     run_cmd("rm $generated_ref");
+# }
 
 print_complete( \%options );
 
@@ -285,7 +310,13 @@ sub process_merge2lgt_reference {
 sub generate_standard_ref {
     my $output_dir = shift;
     my $reference  = shift;
+    ## Check input ref
     if ( !-e $reference ) { confess "Error: Reference doesn't exist: $reference\n"; }
+    ## Check if we already have the genereate ref (don't want to overwrite when Qsub is used and multiple scripts running at once)
+    if ( -e "$output_dir/Generated.fa" ) {
+        print STDERR "Already found and will use a previously generated.ref: $output_dir/Generated.fa.\n";
+        return "$output_dir/Generated.fa";
+    }
 
     # Calculate the min. sequence length needed
     my $ref_size = ( $insert_size * 3 ) + $stdev + 2;
@@ -313,6 +344,14 @@ sub generate_lgt_refs {
     my $merged2lgt_ref = shift;
     my $ref1           = shift;
     my $ref2           = shift;
+    ## Check input ref
+    if ( !-e $merged2lgt_ref ) { confess "Error: Reference doesn't exist: $merged2lgt_ref\n"; }
+    ## Check if we already have the genereate ref (don't want to overwrite when Qsub is used and multiple scripts running at once)
+    if ( -e "$output_dir/lgt_ref1.fa" and -e "$output_dir/lgt_ref2.fa" ) {
+        print STDERR "Already found and will use previous generated_lgt_refs: $output_dir/lgt_ref1.fa and $output_dir/lgt_ref2.fa.\n";
+        return "$output_dir/lgt_ref1.fa", "$output_dir/lgt_ref2.fa";
+    }
+
     my ( $merged2lgt_fn, $merged2lgt_path, $merged2lgt_suff ) = fileparse( $merged2lgt_ref, ( ".fa", ".fasta" ) );
     if ( -e "$merged2lgt_path/Ref_img_cords.txt" ) {
         open( my $IN, "<", "$merged2lgt_path/Ref_img_cords.txt" ) or confess "Error: Unable to open: $merged2lgt_path/Ref_img_cords.txt\n";
@@ -374,8 +413,10 @@ sub help {
         --reads=                The number of reads to generate for calculating the JSD. A single #, comma seperated string, or a file w/ 1 # /line.
         --ref=                  Standard Fasta Reference. 
         --lgt_ref=              Fasta reference from merge_2lgt_bams.pl ## Not implemented yet.
-        --iterate=                  Number of times to iterate over each number of reads.
-        --output_dir=               /path/for/output/
+        --iterate=              Number of times to iterate over each number of reads.
+        --output_dir=           /path/for/output/
         --threads=   
+        --sub_name=
+        --project=
          \n";
 }
