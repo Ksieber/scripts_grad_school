@@ -7,7 +7,7 @@ use Carp;
 $Carp::MaxArgLen = 0;    ## Report full length error
 use Exporter;
 our @ISA    = qw(Exporter);
-our @EXPORT = qw( run_cmd setup_logs Qsub Qsub_script );
+our @EXPORT = qw( run_cmd setup_logs Qsub Qsub_script find_files );
 ## &run_cmd logs a unix cmd, executes it, checks it did not fail
 ## &run_cmd can also take a fh to log the commands to the fh
 ## &setup_logs takes a hash ref. of input->output_dirs and returns a hash reference (input->fh);
@@ -20,7 +20,6 @@ our @EXPORT = qw( run_cmd setup_logs Qsub Qsub_script );
 ## Suggested use: Qsub($cmd,$log);
 ## Suggested use: Qsub({ cmd=> $cmd, threads=> 4, sub_mem=>"4G", wd=>$output_dir })
 ## Suggested use: Qsub_script(\%options);
-
 
 =head2 run_cmd
     Title       : run_cmd
@@ -329,6 +328,22 @@ sub _Qsub_opt {
     print $fh "QSUB: $report\n";
     sleep $sleep;
     return $report;
+}
+
+=head2 find_files 
+    Title       :  find_files
+    Usage       :  my @files = find_files("/some/dir/","*.txt");
+    Function    :  Find all the files in a directory with the given name.
+    Retruns     :  Array of files.
+=cut 
+
+sub find_files {
+    my $directory    = shift;
+    my $name         = shift;
+    my $files_string = run_cmd("find $directory -name \'$name\'");
+    my @files        = split( /\n/, $files_string );
+    foreach my $file (@files) { chomp($file); }
+    return @files;
 }
 
 1;

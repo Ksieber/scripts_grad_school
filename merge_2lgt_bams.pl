@@ -996,7 +996,6 @@ sub optimize_refs {
                 printf VAR ( "%-20s%-20s", $jsd_ci_lower, $jsd_ci_upper );        ##
             }
 
-            #printf VAR ( "%-20.4f%-20.4f", $jsd_ci_lower, $jsd_ci_upper );
             ## Close R instance
             $R->stop();
         }
@@ -1538,7 +1537,7 @@ sub _bam2regions_of_coverage_add_region {
 sub help {
     die
         "Help: This script will take a 2 bams mapped @ different references and merge the references & map at the merged reference. The final new bam can be drawn as a png or svg. This is useful for merging and illustrating LGT regions.
-    ------------------------------------------------------------------------------------------------------------------------------------------------------------
+    --------------------------------------------------------------------------------------------------------------------------------------------------------
     --bam1=                 bam1. Assumes position sorted & indexed. If not, use --sort=1. (Mandatory)
       --bam1_region=        <chr#:100-200> Pull reads only from this region. (Highly recommended)
       --split_bam1_cov=     <0|1> [0] 1= Try to pull reads from regions of the bam with coverage.
@@ -1547,53 +1546,53 @@ sub help {
       --bam2_region=        <chr#:100-200> Pull reads only from this region. (Highly recommended)
       --split_bam2_cov=     <0|1> [0] 1= Try to pull reads from regions of the bam with coverage.
       --sort2=              <0|1> [0] 1= Position sort & index bam2.
-    ------------------------------------------------------------------------------------------------------------------------------------------------------------
+    --------------------------------------------------------------------------------------------------------------------------------------------------------
     --ref1=                 Reference 1 fasta.      (Assumes bam1 is already mapped aginst ref1)[ /local/projects-t3/HLGT/references/hg19/hg19.fa ]
       --ref1_region=        <chr#:100-200> Use this reference range to map & draw reads against. ** More info below **
     --ref2=                 Reference 2 fasta.      (If no --bam2, and --ref2 is used, --bam1 will be mapped against --ref2)
       --ref2_region=        <chr#:100-200> Use this reference range to map & draw reads against.  ** More info below **
-    ------------------------------------------------------------------------------------------------------------------------------------------------------------
+    --------------------------------------------------------------------------------------------------------------------------------------------------------
     --titrate_refs=         <0|1> [0] 1= Calculate the ideal distance of sequence between reads. ** More Info on --titrate_refs below **
       --anchor_bam1=        <0|1> [0] 1= Keep upstream region the same while titrating downstream bam region. 0 = anchor Right. 
       --titrate_n_string=   <0|1> [0] 1= Calculate ideal distance of unknown sequence between reads.
       --jsd=                <0|1> [0] 1= Calculate Jensen-Shannon Divergence between the model and reference insert size distributions.
     --fix_orientation=      <0|1> [1] 1= Try to determine how the references should be organized L-vs-R to make Mates face eachother.
                                       0= Bam1 is on Left, Bam2 is on Right.
-    ------------------------------------------------------------------------------------------------------------------------------------------------------------
+    --------------------------------------------------------------------------------------------------------------------------------------------------------
     --reads_list=           Path to a file with a list of desired reads to parse for. 1 read ID / line. 
     --M_only=               <0|1> [0] 1= When remapping to the merged reference, only keep M_* read pairs
     --MM_only=              <0|1> [1] 1= When remapping to the merged reference, only keep M_M read pairs (Highly recommended)
     --merged_ref_name=      Name for the new reference.         [Merged]
     --n_num|n=              Number of \"N's\" to insert inbetween merged references. [0] May also take comma delimited list or multiple entries. 
     --draw_nstring=         <0|1> [0] 1= Draw the n-string \"contig\".
-    ------------------------------------------------------------------------------------------------------------------------------------------------------------
+    --------------------------------------------------------------------------------------------------------------------------------------------------------
     --png=                  <0|1> [0] 1= Create a png img of the merged bam.
     --svg=                  <0|1> [0] 1= Create a svg img of the merged bam.
       --image_length=       Ajust the length of the png created.
       --image_width=        Adjust the width of the png created. 
       --pad_scale=          Pad white space around img. 
-    ------------------------------------------------------------------------------------------------------------------------------------------------------------
+    --------------------------------------------------------------------------------------------------------------------------------------------------------
     --draw_both|B=          <0|1> [0] 1= Draw both a \"normal\" & stdev color coded img.
     --draw_stdev|d=         <0|1> [0] 1= Color code the reads based on # of STDEV from the median insert size;
                                 +/- STDEV * 0.5=Light Red/Green ; 1=Red/Green ; 2=Dark Red/Green
     --insert_size|I=        < # > 
     --stdev|D=              < # >
     --picard_file|P=        < /path/to/file.txt > Picard insert metrics file. Must be used if --stdev && --insert_size are not used or if jsd is calculated.
-    ------------------------------------------------------------------------------------------------------------------------------------------------------------                              
+    --------------------------------------------------------------------------------------------------------------------------------------------------------                              
     --output_dir|o=         Directory for output.               [/options/bam1/dir/]
     --output_prefix|p=      Prefix for the output fasta & bam.  [bam1-merged-bam2]
     --stdout=               <0|1> [0] 1= Output goes to STDOUT. Either pipe it into a \"display\" ( | display - ) or redirect it to a new file ( > new.img)
     --help|?
-    ------------------------------------------------------------------------------------------------------------------------------------------------------------
+    --------------------------------------------------------------------------------------------------------------------------------------------------------
      ** More info  ** 
     --ref#_region = May also accept a file with 1 region / line. May also take comma delimited regions or multiple --ref_region entries. If no region given, defaults to bam region. 
     Either --optimize option will calculate the ideal distance between references and draw +2, +1, +.5,0,-.5, -1 stdev's of read insert size around calculated ideal. 
     When using either --optimize option, you must pass --stdev & --insert_size.
-     ------------------------------------------------------------------------------------------------------------------------------------------------------------
+     --------------------------------------------------------------------------------------------------------------------------------------------------------
     Example: perl merge_2lgt_bams.pl --bam1=bam_with_lgt_reads.bam --sort1=1 --ref1=hg19.fa --ref2=bacteria_with_lgt.fa --ref1_region=chr1:100-500 --bam1_region=chr1:200-400 --MM_only=1 --svg=1
     This will pull reads from the {bam_with_lgt_reads.bam} @ {chr1:200-400} ; map them against {bacteria_with_lgt.fa} ; create a new reference from {chr1:100-500} & 
     the region where the reads mapped in the {bacteria_with_lgt.fa}. The reads that are {mapped-mapped} to the new reference are then kept in the final bam and drawn as an {svg}. 
-    ------------------------------------------------------------------------------------------------------------------------------------------------------------\n";
+    --------------------------------------------------------------------------------------------------------------------------------------------------------\n";
 }
 
 ###################################

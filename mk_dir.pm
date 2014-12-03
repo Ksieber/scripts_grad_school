@@ -17,6 +17,7 @@ our @EXPORT = qw( mk_dir );
 sub mk_dir {
     my $dir = shift;
     chomp($dir);
+    $dir =~ s/\/{2,}/\//g;
     run_cmd("mkdir -p -m u=rwx,g=rwx,o= $dir");
 }
 1;
