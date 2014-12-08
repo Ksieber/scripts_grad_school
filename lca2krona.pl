@@ -18,7 +18,7 @@ if ( !$options{input} ) { die "Error: You must pass an input file with --input=<
 
 if ( defined $options{Qsub} and $options{Qsub} == 1 ) {
     if ( !$options{sub_name} ) { $options{sub_name} = "lca2krona" }
-    if ( !$options{project} )  { $options{project}  = $lgtseek->{project}; }
+    if ( !$options{project} )  { $options{project}  = "jdhotopp-lab"; }
     Qsub_script( \%options );
 }
 

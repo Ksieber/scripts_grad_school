@@ -3,18 +3,22 @@ use warnings;
 use strict;
 use run_cmd;
 use print_call;
+use mk_dir;
 use File::Basename;
 use Statistics::R;
 
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
-my $results = GetOptions( \%options, 'input|i=s', 'output_dir|o=s', 'graph|g=i', 'help|?' ) or die "Unrecognized command line option. Please try agian.\n";
+my $results = GetOptions( \%options, 'input|i=s', 'output_dir|o=s', 'graph|g=i', 'ylim=s', 'help|?' ) or die "Unrecognized command line option. Please try agian.\n";
 
+if ( $options{help} )   { &help; }
 if ( !$options{input} ) { die "Error: Must give an input directory merge JSD_titration_summary.txt from. Please try again.\n"; }
 my $files = run_cmd("find $options{input} -name \'*JSD_titration_summary.txt\'");
 my @files_to_merge = split( /\n/, $files );
 
-my $output_dir = defined $options{output_dir} ? $options{output_dir} : $options{input};
+my $output_dir = defined $options{output_dir} ? $options{output_dir}     : $options{input};
+my $ylim       = defined $options{ylim}       ? " + ylim($options{ylim})" : undef;
+mk_dir("$output_dir");
 
 open( my $OUT1, ">", "$output_dir/merged_jsd_vals.txt" )    or die "Error: Unable to open output: $output_dir/merged_jsd_vals.txt";
 open( my $OUT2, ">", "$output_dir/merged_jsd_ci-mins.txt" ) or die "Error: Unable to open output: $output_dir/merged_jsd_vals.txt";
@@ -97,13 +101,19 @@ if ( defined $options{graph} and $options{graph} == 1 ) {
     my $number_of_uniq_reads = scalar( keys %uniq_read_numbers );
     $R->run("df<-data.frame(reads, jsd, stringsAsFactors=FALSE)");
     $R->run("pdf(file=\"$output_dir/JSD_merged_plot.pdf\")");
-    $R->run(
-        "qplot(factor(reads), jsd, data=df, geom=\"boxplot\", xlab=\"reads\", ylab=\"JSD\", fill=factor(reads)) + theme(legend.position=\"none\")"
-    );
+    $R->run("qplot(factor(reads), jsd, data=df, geom=\"boxplot\", xlab=\"reads\", ylab=\"JSD\", fill=factor(reads)) + theme(legend.position=\"none\")$ylim");
     $R->run('dev.off()');
 }
 
 print_complete( \%options );
+
+sub help {
+    die "This script will merge the JSD_titration_summary.txt from titrate_jsd_Random_reads_from_INT.pl.
+	--input=		/path/to/dir/  Will find *all* the JSD_titration_summary.txt in this dir.
+	--output_dir=	/path/for/output/ Defaults to [-input] path.
+	--graph|g=		<0|1> [0] 1= Create boxplot of the JSD_titration_summary.txt files.
+	  --ylim=		< #,# > Min,Max y-axis limits.\n";
+}
 
 __END__
 + scale_fill_gradientn(values=reads, colours = rainbow($number_of_uniq_reads)) +

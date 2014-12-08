@@ -11,11 +11,13 @@ use Statistics::R;
 use Data::Dumper;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
-my $results
-    = GetOptions( \%options, 'input|i=s', 'input_list|I=s', 'top_n_otus=i', 'column|c=i', 'lca_cut=i', 'key=i', 'output_dir|o=s', 'output_prefix|p=s', 'bottom_margin=i', 'right_margin=i', 'help|?' )
-    or die "Unrecognized command line option. Please try agian.\n";
+my $results = GetOptions(
+    \%options,           'input|i=s',       'input_list|I=s', 'top_n_otus=i', 'column|c=i', 'lca_cut=i', 'key=i', 'output_dir|o=s',
+    'output_prefix|p=s', 'bottom_margin=i', 'right_margin=i', 'help|h',       'help_full|?'
+) or die "Unrecognized command line option. Please try agian.\n";
 
-if ( $options{help} ) { &help; }    ## &help is @ the end of the script
+if ( $options{help} )      { &help; }         ## &help is @ the end of the script
+if ( $options{help_full} ) { &help_full; }    ## &help is @ the end of the script
 
 if ( !$options{input} and !$options{input_list} ) { die "Error: Must pass an input of LCA.txt to convert to a matrix using --input= or --input_list=[files.list] or [file1.txt,file2.txt]\n"; }
 
@@ -45,7 +47,7 @@ foreach my $input (@$inputs) {
         next if ( scalar(@split_line) == 1 );
         my $lca       = $split_line[$column];
         my @split_lca = split( /;/, $lca );
-        my @short_lca = splice( @split_lca, 0, $lca_cut );
+        my @short_lca = ( $lca_cut eq "-1" ) ? @split_lca : splice( @split_lca, 0, $lca_cut );
         my $otu       = $short_lca[-1];
         $otu =~ s/\s+/__/g;
         $otu =~ s/\//_/g;
@@ -96,6 +98,7 @@ my $rownames_string = "\"" . join( "\", \"", @filename_list ) . "\"";
 # 5th, load & manipulate the data in R.
 my $R = Statistics::R->new( r_bin => '/home/ksieber/bin/R' );
 $R->run('library(gplots);');
+
 # $R->run('library(heatmap3)');
 my $first_data = 1;
 
@@ -128,17 +131,33 @@ $R->run("COLORS = c(rainbow(200)[32:200],reds)");
 $R->run("pdf(file=\"$output\")");
 $R->run(
     "heatmap.2(data, 
-	col=COLORS,
-	dendrogram=\"none\",
-	Rowv=NA,
-	Colv=NA,
-	trace=\"none\",
-	margin=c($bottom_margin,$right_margin),
-	keysize=1,
-	key=$key,
-	)"
+    col=COLORS,
+    dendrogram=\"none\",
+    Rowv=NA,
+    Colv=NA,
+    trace=\"none\",
+    margin=c($bottom_margin,$right_margin),
+    keysize=1,
+    key=$key,
+    )"
 );
 $R->run("dev.off()");
 
+sub help_full {
+    die "This script will create a HEATMAP from file(s) with: \"{read_name}    {LCA}\" file.
+    --input|i=          LCA File.
+    --input_list=       List of LCA files, either a file with 1 file/line or a comma seperated list.
+    --output_dir|o=     /path/for/output/
+    --output_prefix|p=  {prefix_for_output}.pdf
+    --column=           < # >   [1]  Column to select LCA from the file, 0 based counting. 
+    --key=              < 0|1 > [1]  Draw Heatmap key.
+    --lca_cut=          < # >   [7]  Cut the LCA Taxonomy at this split #. 
+       0=Life 1=Domain 2=Kingdom 3=Phylum 4=Class 5=Order 6=Family 7=Genus 8=Species 9=Strain -1=All
+    --top_n_otus=       < # >   [20] Draw the {top_n_otus}
+    --bottom_margin=    < # >   [99] Heatmap bottom_margin.
+    --right_margin=     < # >   [99] Heatmap right_margin.
+    --help|h 
+    --help_full|?\n";
+}
 __END__
 
