@@ -32,6 +32,25 @@ else {
     else                         { die "Could not determine what type of file this is. Please try again.\n"; }
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Subroutines
 sub process_bam {
     my $opts = shift;
@@ -88,8 +107,6 @@ sub clear_counts {
 }
 
 sub print_counts {
-
-    #print "%A: " . ( $counts{A} / $counts{total} ) * 100 . "\t";
     print "\%A: ";
     printf "%2.1f\t", ( ( $counts{A} / $counts{total} ) * 100 );
     print "\%T: ";
@@ -157,14 +174,16 @@ sub process_fastq {
 }
 
 sub process_seq_fh {
-    my $seq_fh = shift;
+    my $seq_fh    = shift;
+    my $seqs_seen = 0;
     while ( my $seq = $seq_fh->next_seq() ) {
         print $seq->display_id() . ": ";
         count( $seq->seq() );
         &print_counts;
         &clear_counts;
+        $seqs_seen++;
     }
-    &print_grand_total;
+    &print_grand_total if ( $seqs_seen > 1 );
 }
 
 sub help {
