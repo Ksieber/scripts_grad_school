@@ -41,7 +41,13 @@ sub run_cmd {
     if ( -e $log ) { print $fh "CMD: $cmd\n"; }
     chomp( my $res = `$cmd` );
     if ($?) {
-        confess "FAIL_CMD: $cmd died with message: $res\n";
+        print STDERR "FAIL_CMD: $cmd died with message: $res\n";
+        print STDERR "Pausing 30s and trying to run the cmd again.\n";
+        sleep 30;
+        chomp( $res = `$cmd` );
+        if ($?) {
+            confess "FAIL_CMD: $cmd died again with message: $res\n";
+        }
     }
     return $res;
 }
@@ -253,8 +259,7 @@ sub _Qsub_cmd {
     }
     chomp( my $report = `$qsub` );
     if ($?) {
-        print $fh "$?\n";
-        confess "Error: $qsub died with message: $report\n";
+        print STDERR "*** QSUB WARNING *** May have failed: $? with report: $report\n";
     }
     print $fh "$report\n";
     return $report;
@@ -322,8 +327,7 @@ sub _Qsub_opt {
     }
     chomp( my $report = `$que` );
     if ($?) {
-        print $fh "$?\n";
-        confess "Error: $que died with message: $report\n";
+        print STDERR "*** QSUB WARNING *** $qsub may have failed: $? with report: $report\n";
     }
     print $fh "QSUB: $report\n";
     sleep $sleep;
