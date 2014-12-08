@@ -57,12 +57,12 @@ if ( $options{Qsub} ) { Qsub_script( \%options ); }
 my ( $fn, $path, $suf ) = fileparse( $options{input}, ( '.list', '.txt' ) );
 if ( $path =~ /\.\// ) { chomp( $path = `pwd` ); $path = $path . "/"; }
 
-my $output_dir = $options{output_dir} ? $options{output_dir} : $path;
-my $subdirs    = $options{subdirs}    ? $options{subdirs}    : 0;
-if ( $subdirs == 1 ) { $output_dir = $options{output_dir} . "/$fn"; }
+my $output_dir    = $options{output_dir}    ? $options{output_dir}    : $path;
+my $output_prefix = $options{output_prefix} ? $options{output_prefix} : $fn;
+my $subdirs       = $options{subdirs}       ? $options{subdirs}       : 0;
+if ( $subdirs == 1 ) { $output_dir = $options{output_dir} . "/$output_prefix"; }
 mk_dir("$output_dir");
 
-my $output_prefix = $options{output_prefix} ? $options{output_prefix} : $fn;
 my $number_of_lists = $options{lists};
 
 my $input_linecount = wc( $options{input} );
@@ -77,27 +77,31 @@ for ( my $i = 0; $i < $number_of_lists; $i++ ) {
 }
 
 while (<$IN>) {
-    my $random_fh = int( rand($number_of_lists) - 1 );
-    my $to_print  = 1;
+    my $random_fh = int( rand($number_of_lists) );
+    if ( $random_fh >= $number_of_lists ) { $random_fh = 0; }
+    my $to_print = 1;
     while ( $to_print == 1 ) {
+        if ( !$fh->{$random_fh}->{open} ) { print "fail: $random_fh\n"; }
         if ( $fh->{$random_fh}->{open} == 1 ) {
-            print { $fh->{$random_fh}->{fh} } $_;
+            print { $fh->{"$random_fh"}->{fh} } $_;
             $to_print = 0;
             next;
-        }
-        elsif ( $random_fh >= 0 ) {
-            $random_fh++;
         }
         elsif ( $random_fh >= $number_of_lists ) {
             $random_fh = 0;
         }
-
+        elsif ( $random_fh >= 0 ) {
+            $random_fh++;
+            if ( $random_fh >= $number_of_lists ) {
+                $random_fh = 0;
+            }
+        }
     }
 
     # Update fh status
     $fh->{$random_fh}->{prints}++;
     if ( $fh->{$random_fh}->{prints} == $max_prints ) {
-        $fh->{$random_fh}->{open} = 0;
+        $fh->{$random_fh}->{open} = 2;
     }
 }
 
