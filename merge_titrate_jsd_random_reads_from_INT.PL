@@ -17,7 +17,7 @@ my $files = run_cmd("find $options{input} -name \'*JSD_titration_summary.txt\'")
 my @files_to_merge = split( /\n/, $files );
 
 my $output_dir = defined $options{output_dir} ? $options{output_dir}     : $options{input};
-my $ylim       = defined $options{ylim}       ? " + ylim($options{ylim})" : undef;
+my $ylim       = defined $options{ylim}       ? " + ylim($options{ylim})" : "";
 mk_dir("$output_dir");
 
 open( my $OUT1, ">", "$output_dir/merged_jsd_vals.txt" )    or die "Error: Unable to open output: $output_dir/merged_jsd_vals.txt";

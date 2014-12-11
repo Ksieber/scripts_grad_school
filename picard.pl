@@ -9,6 +9,7 @@ my $results = GetOptions( \%options, 'mem|m=s', 'Picard_jar=s', 'argv_string=s',
 if ( $options{help} ) {
     die "This script will launch Picard.jar
     Arguements for Picard are passed through ARGV or --argv_string=\"string\". ex: picard.pl SamToFastq I=input F=out.fq
+    To get help information for each component of Picard use plain \"help\" after the component name. ex: picard.pl SamToFastq help
 	--mem= 			[2g] Amount of mem for java to use.
 	--Qsub=			<0|1> [0] 1= Qsub.
 	  --sub_mem=	[3G]
