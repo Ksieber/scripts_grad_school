@@ -6,18 +6,22 @@ use print_call;
 use mk_dir;
 use File::Basename;
 use Statistics::R;
+use Data::Dumper;
 
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
-my $results = GetOptions( \%options, 'input|i=s', 'output_dir|o=s', 'graph|g=i', 'ylim=s', 'help|?' ) or die "Unrecognized command line option. Please try agian.\n";
+my $results = GetOptions( \%options, 'input|i=s', 'output_dir|o=s', 'graph|g=i', 'test_linear_relationship|T=i', 'ylim=s', 'help|?' ) or die "Unrecognized command line option. Please try agian.\n";
 
 if ( $options{help} )   { &help; }
 if ( !$options{input} ) { die "Error: Must give an input directory merge JSD_titration_summary.txt from. Please try again.\n"; }
 my $files = run_cmd("find $options{input} -name \'*JSD_titration_summary.txt\'");
 my @files_to_merge = split( /\n/, $files );
 
-my $output_dir = defined $options{output_dir} ? $options{output_dir}     : $options{input};
-my $ylim       = defined $options{ylim}       ? " + ylim($options{ylim})" : "";
+my $output_dir               = defined $options{output_dir}               ? $options{output_dir}               : $options{input};
+my $ylim                     = defined $options{ylim}                     ? " + ylim($options{ylim})"          : "";
+my $test_linear_relationship = defined $options{test_linear_relationship} ? $options{test_linear_relationship} : "0";
+my $draw_graph               = defined $options{graph}                    ? $options{graph}                    : "0";
+$draw_graph = $test_linear_relationship == 1 ? "1" : $draw_graph;
 mk_dir("$output_dir");
 
 open( my $OUT1, ">", "$output_dir/merged_jsd_vals.txt" )    or die "Error: Unable to open output: $output_dir/merged_jsd_vals.txt";
@@ -60,7 +64,7 @@ close $OUT1;
 close $OUT2;
 close $OUT3;
 
-if ( defined $options{graph} and $options{graph} == 1 ) {
+if ( $draw_graph == 1 ) {
     my @data_files = find_files( $options{input}, "*JSD_values_conf-intrvls.txt" );
     my @read_number_list;
     my @jsd_list;
@@ -97,22 +101,40 @@ if ( defined $options{graph} and $options{graph} == 1 ) {
     foreach my $jsd (@jsd_list) { $jsd_string_for_R = $jsd_string_for_R . "$jsd,"; }
     $jsd_string_for_R =~ s/(\,)$//g;            # Remove trailing ","
     $R->run("jsd <- c($jsd_string_for_R)");
-
     my $number_of_uniq_reads = scalar( keys %uniq_read_numbers );
+
+    # Create boxplots for JSD titration over # of reads.
     $R->run("df<-data.frame(reads, jsd, stringsAsFactors=FALSE)");
     $R->run("pdf(file=\"$output_dir/JSD_merged_plot.pdf\")");
     $R->run("qplot(factor(reads), jsd, data=df, geom=\"boxplot\", xlab=\"reads\", ylab=\"JSD\", fill=factor(reads)) + theme(legend.position=\"none\")$ylim");
     $R->run('dev.off()');
+
+    if ( $test_linear_relationship == 1 ) {
+
+        # Test for linear relationship between JSD and #reads
+        # open( my $LIN, ">", "$output_dir/jsd_linear_test.txt" ) or die "Error: Unable to open output: $output_dir/jsd_linear_test.txt\n";
+        # my $linear_regression_test = $R->run("coef(lm(jsd ~ reads))");
+        # my @split_linear_regression_test = split( /\n/, $linear_regression_test );
+        # my ( $b, $m ) = ( $1, $2 ) if ( $split_linear_regression_test[1] =~ /([0-9-e.]+)\s+([0-9-e.]+)/ );
+
+        # Illustrate linear relationship
+        $R->run("pdf(file=\"$output_dir/jsd_linear_test.pdf\")");
+        $R->run("plot <- ggplot(df, aes(reads,jsd))$ylim");
+        $R->run("plot + geom_point(aes(color=factor(reads)))$ylim");
+        ## $R->run("plot + geom_point(aes(color=factor(reads))) + geom_abline(intercept=$b, slope=$m)$ylim");
+        $R->run('dev.off()');
+    }
 }
 
 print_complete( \%options );
 
 sub help {
     die "This script will merge the JSD_titration_summary.txt from titrate_jsd_Random_reads_from_INT.pl.
-	--input=		/path/to/dir/  Will find *all* the JSD_titration_summary.txt in this dir.
-	--output_dir=	/path/for/output/ Defaults to [-input] path.
-	--graph|g=		<0|1> [0] 1= Create boxplot of the JSD_titration_summary.txt files.
-	  --ylim=		< #,# > Min,Max y-axis limits.\n";
+    --input=                            /path/to/dir/  Will find *all* the JSD_titration_summary.txt in this dir.
+    --output_dir=                       /path/for/output/ Defaults to [-input] path.
+    --graph|g=                          <0|1> [0] 1= Create boxplot of the JSD_titration_summary.txt files.
+      --ylim=                           < #,# > Min,Max y-axis limits.
+    --test_linear_relationship|T=       <0|1> [0] 1= Draw normal boxplot and a scatter plot with continuous x-axis.\n";
 }
 
 __END__

@@ -10,10 +10,10 @@ our @EXPORT = qw( read_in_list );
 =head2 &read_in_list
 
  Title   : read_in_list
- Usage   : 
- Function: 
- Returns : 
- Args    : 
+ Usage   : my @list = read_in_list($file);
+ Function: opens a file, reads in line, and returns an array of the lines
+ Returns : ARRAY
+ Args    : n/a
 =cut
 sub read_in_list {
     my $file = shift;

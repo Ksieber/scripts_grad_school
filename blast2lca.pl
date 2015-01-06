@@ -49,7 +49,7 @@ my $results = GetOptions(
     'help|?',
 ) or die "Error: Unrecognized command line option. Please try again.\n";
 
-use lib ( "/local/projects-t3/HLGT/scripts/lgtseek/lib/", "/local/projects/ergatis/package-driley/lib/perl5/x86_64-linux-thread-multi/" );
+use lib ( '/home/ksieber/perl5/lib/perl5/', '/local/projects-t3/HLGT/scripts/lgtseek/lib/', '/local/projects/ergatis/package-driley/lib/perl5/x86_64-linux-thread-multi/' );
 use print_call;
 print_hostname( \%options );    ## This is useful for trouble shooting grid nodes that might be missing modules for LGTSeek etc.
 
@@ -64,6 +64,7 @@ if ( $options{help} ) { &help; }    ## @ end of script
 if ( !$options{input} && !$options{input_list} ) { die "Error: Please give an input blast-m8 file with --input=<FILE> or --input_list=<LIST>. Try again or use --help_full.\n"; }
 
 ## Qsub:
+## Initialize LGTSeek.pm
 my $lgtseek = LGTSeek->new2( \%options );
 if ( $options{Qsub} ) {
     if ( !$options{sub_name} ) { $options{sub_name} = "m8_2lca"; }
@@ -73,8 +74,7 @@ if ( $options{Qsub} ) {
 
 ## Print the script call
 print_call( \%options );
-## Initialize LGTSeek.pm
-my $lgtseek = LGTSeek->new2( \%options );
+
 ## Setup array ref of inputs
 my $inputs = setup_input( \%options );
 
