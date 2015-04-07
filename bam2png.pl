@@ -42,7 +42,7 @@ my $pad_scale    = defined $options{pad_scale}    ? $options{pad_scale}    : "0"
 ## Sort bam
 if ( $sort == 1 ) {
     run_cmd("samtools sort $input $output_dir$fn\_bam2png_tmp_srt");
-    run_cmd("samtools index $output_dir$fn\_bam2png_tmp_srt.bam $output_dir$fn\_bam2png_tmp_srt.bai");
+    run_cmd("samtools index $output_dir$fn\_bam2png_tmp_srt.bam");
     $input = "$output_dir$fn\_bam2png_tmp_srt.bam";
 }
 #############################################################

@@ -12,8 +12,8 @@ use Data::Dumper;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
 my $results = GetOptions(
-    \%options,           'input|i=s',       'input_list|I=s', 'top_n_otus=i', 'column|c=i', 'lca_cut=i', 'key=i', 'output_dir|o=s',
-    'output_prefix|p=s', 'bottom_margin=i', 'right_margin=i', 'help|h',       'help_full|?'
+    \%options,    'input|i=s',  'input_list|I=s', 'abundance|a=s',     'top_n_otus=i',    'column|c=i',     'lca_cut=i', 'key=i',
+    'na_color=s', 'output|O=s', 'output_dir|o=s', 'output_prefix|p=s', 'bottom_margin=i', 'right_margin=i', 'help|h',    'help_full|?'
 ) or die "Unrecognized command line option. Please try agian.\n";
 
 if ( $options{help} )      { &help; }         ## &help is @ the end of the script
@@ -25,14 +25,18 @@ my $inputs = setup_input( \%options );
 my ( $fn, $path, $dir ) = defined $options{input} ? fileparse( $options{input}, qr/\.[^\.]+/ ) : fileparse( $options{input_list}, qr/\.[^\.]+/ );
 my $output_dir    = defined $options{output_dir}    ? $options{output_dir}    : $path;
 my $output_prefix = defined $options{output_prefix} ? $options{output_prefix} : $fn;
-my $output        = "$output_dir/$output_prefix\_heatmap.pdf";
+my $output        = defined $options{output}        ? $options{output}        : "$output_dir/$output_prefix\_heatmap.pdf";
+$output =~ s/\/{2,}/\//g;                     ## Cleanup output name with multiple "/" in it. ie: /path//for//output.pdf -> /path/for/output.pdf
 my $column        = defined $options{column}        ? $options{column}        : 1;
 my $key           = defined $options{key}           ? $options{key}           : "1";
 my $top_n_otus    = defined $options{top_n_otus}    ? $options{top_n_otus}    : "20";
 my $bottom_margin = defined $options{bottom_margin} ? $options{bottom_margin} : "16";
 my $right_margin  = defined $options{right_margin}  ? $options{right_margin}  : "12";
 my $lca_cut       = defined $options{lca_cut}       ? $options{lca_cut}       : "7";
+my $na_color      = defined $options{na_color}      ? $options{na_color}      : "#999999";
+if ( !$options{abundance} ) { $options{abundance} = "LN"; }
 my $data;
+my $total_otu_per_fn;
 my %unique_otu_counts;
 my $otu_ranks;
 
@@ -58,6 +62,7 @@ foreach my $input (@$inputs) {
         $otu =~ s/\"//g;
         $otu =~ s/\.//g;
         $data->{$fn}->{$otu}++;
+        $total_otu_per_fn->{$fn}++;
         $unique_otu_counts{$otu}++;
         $otu_ranks->{$otu} = scalar(@split_lca);    # Wrough estimate of specificity of the OTU (higher rank = more specific)
     }
@@ -95,23 +100,64 @@ else {
 my $num_of_files = scalar(@filename_list);
 my $rownames_string = "\"" . join( "\", \"", @filename_list ) . "\"";
 
-# 5th, load & manipulate the data in R.
+# 5th, Print some nice text for the user
+print STDERR "\n\t*** lca2heatmap.pl ***\n";
+if ( $options{abundance} eq 'RELATIVE' or $options{abundance} eq 'REL' ) { print STDERR "\t*** Creating heatmap of the relative abundance. ***\n"; }
+elsif ( $options{abundance} eq 'LOG' )    { print STDERR "\t*** Creating heatmap of the LOG transformed relative abundance. ***\n"; }
+elsif ( $options{abundance} eq 'LN' )     { print STDERR "\t*** Creating heatmap of the LN transformed relative abundance. ***\n"; }
+elsif ( $options{abundance} eq 'COUNTS' ) { print STDERR "\t*** Creating heatmap of the counts of OTU abundance. ***\n"; }
+else                                      { die "*** ERROR *** Unable to determine the abundance transform: $options{abundance}\n"; }
+print STDERR "\t*** OUTPUT = $output ****\n\n";
+
+# 6th, load & manipulate the data into R.
 my $R = Statistics::R->new( r_bin => '/home/ksieber/bin/R' );
 $R->run('library(gplots);');
-
-# $R->run('library(heatmap3)');
+$R->run("reds = rev(rainbow(200))[1:10]");
+$R->run("COLORS = c(rainbow(200)[32:200],reds)");
 my $first_data = 1;
 
 foreach my $otu (@top_n_otus_list) {
     my @otus_per_fn_list;
+
     foreach my $fn (@filename_list) {
         if ( defined $data->{$fn}->{$otu} ) {
-            push( @otus_per_fn_list, $data->{$fn}->{$otu} );
+            if ( $options{abundance} eq 'LOG' ) {
+                my $log = log( ( $data->{$fn}->{$otu} / $total_otu_per_fn->{$fn} ) * 100 ) / log(10);
+                push( @otus_per_fn_list, $log );
+            }
+            if ( $options{abundance} eq 'LN' ) {
+                my $ln = log( ( $data->{$fn}->{$otu} / $total_otu_per_fn->{$fn} ) * 100 );
+                push( @otus_per_fn_list, $ln );
+            }
+            elsif ( $options{abundance} eq 'RELATIVE' or $options{abundance} eq 'REL' ) {
+                my $relative = ( $data->{$fn}->{$otu} / $total_otu_per_fn->{$fn} ) * 100;
+                push( @otus_per_fn_list, $relative );
+            }
+            elsif ( $options{abundance} eq 'COUNTS' ) {
+                push( @otus_per_fn_list, $data->{$fn}->{$otu} );
+            }
         }
         else {
-            push( @otus_per_fn_list, "0" );
+            push( @otus_per_fn_list, "NA" );
+
+            # if ( $options{abundance} eq 'LOG' ) {
+            #     my $log = log($min) / log(10);
+            #     push( @otus_per_fn_list, $log );
+            # }
+            # if ( $options{abundance} eq 'LN' ) {
+            #     my $ln = log($min);
+            #     push( @otus_per_fn_list, $ln );
+            # }
+            # elsif ( $options{abundance} eq 'RELATIVE' or $options{abundance} eq 'REL' ) {
+            #     my $relative = ( $min / $total_otu_per_fn->{$fn} ) * 100;
+            #     push( @otus_per_fn_list, $relative );
+            # }
+            # elsif ( $options{abundance} eq 'COUNTS' ) {
+            #     push( @otus_per_fn_list, $min );
+            # }
         }
     }
+
     my $otus_per_fn_string = join( ", ", @otus_per_fn_list );
     $R->run("$otu<-matrix(c($otus_per_fn_string), nrow=$num_of_files, ncol=1)");
     if ( $first_data == 1 ) {
@@ -125,13 +171,13 @@ foreach my $otu (@top_n_otus_list) {
 $R->run("rownames(data)<-c($rownames_string)");
 $R->run("colnames(data)<-c($colname_string)");
 
-$R->run("reds = rev(rainbow(200))[1:10]");
-$R->run("COLORS = c(rainbow(200)[32:200],reds)");
+# 7th, Actually graph the LCAs
 
 $R->run("pdf(file=\"$output\")");
 $R->run(
     "heatmap.2(data, 
     col=COLORS,
+    na.color=\"$na_color\",
     dendrogram=\"none\",
     Rowv=NA,
     Colv=NA,
@@ -147,13 +193,17 @@ sub help_full {
     die "This script will create a HEATMAP from file(s) with: \"{read_name}    {LCA}\" file.
     --input|i=          LCA File.
     --input_list=       List of LCA files, either a file with 1 file/line or a comma seperated list.
-    --output_dir|o=     /path/for/output/
-    --output_prefix|p=  {prefix_for_output}.pdf
-    --column=           < # >   [1]  Column to select LCA from the file, 0 based counting. 
-    --key=              < 0|1 > [1]  Draw Heatmap key.
-    --lca_cut=          < # >   [7]  Cut the LCA Taxonomy at this split #. 
+      --column=         < # >   [1]  Column to select LCA from the input, 0 based counting. 
+    --output|O=         /path/and/name/for/output.pdf
+      --output_dir|o=   /path/for/output/
+      --output_prefix|p={prefix_for_output}.pdf
+    --abundance=        < LOG | LN | RELATIVE | COUNTS > [LN] Transform abundance. 
+                LOG & LN transform relative abundance. Opts are CASE sensitive. REL = RELATIVE. 
+    --top_n_otus=       < # >   [20] Draw the \${top_n_otus}
+    --lca_cut=          < # >   [7]  Cut the LCA Taxonomy at this split #. (These #s only work for ~microbiome).
        0=Life 1=Domain 2=Kingdom 3=Phylum 4=Class 5=Order 6=Family 7=Genus 8=Species 9=Strain -1=All
-    --top_n_otus=       < # >   [20] Draw the {top_n_otus}
+    --na_color=         [\"#999999\"] Color to substitute for NA data. Takes any \"color\" R:heatmap2 can accept.
+    --key=              < 0|1 > [1]  Draw Heatmap key.
     --bottom_margin=    < # >   [99] Heatmap bottom_margin.
     --right_margin=     < # >   [99] Heatmap right_margin.
     --help|h 

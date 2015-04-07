@@ -265,7 +265,7 @@ sub process_standard_reference {
         confess "Error: The reference isn't large enough to generate wgsim random reads with the [--input] insert size and stdev.\n";
     }
     ## Map the random reads to the ref1
-    my $wgsim_bam = bwa_align(
+    my $wgsim_bam = bwa_aln(
         "$tmp_dir/Test_1.fq,$tmp_dir/Test_2.fq",
         $ref1,
         {   output_dir    => $tmp_dir,
@@ -299,7 +299,7 @@ sub process_merge2lgt_reference {
         confess "Error: Unable to generate SE reads for $lgt_ref2.\nThe reference is probably too short for the STDEV and read length. Check $tmp_dir/wgsim_stderr.txt\n";
     }
     ## Map the random reads to the ref1
-    my $wgsim_bam = bwa_align(
+    my $wgsim_bam = bwa_aln(
         "$tmp_dir/Test_1.fq,$tmp_dir/Test_2.fq",
         $options{lgt_ref},
         {   output_dir    => $tmp_dir,

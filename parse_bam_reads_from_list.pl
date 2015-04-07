@@ -1,22 +1,25 @@
 #!/usr/local/bin/perl
 use strict;
 use warnings;
+$| = 1;
 use run_cmd;
 use mk_dir;
 use File::Basename;
+use print_call;
 use Getopt::Long qw (:config no_ignore_case no_auto_abbrev);
 my %options;
-my $results = GetOptions( \%options, 'input|i=s', 'good_list=s', 'bad_list=s', 'output_prefix|p=s', 'output_dir|o=s', 'sub_name=s', 'Qsub|q=i', 'help|?' )
+my $results = GetOptions( \%options, 'input|i=s', 'good_list=s', 'bad_list=s', 'output|O=s', 'output_prefix|p=s', 'output_dir|o=s', 'sub_name=s', 'Qsub|q=i', 'help|?' )
     or die "Error: Unrecognized command line option. Please try again.\n";
 
 if ( $options{help} ) {
-    die "HELP: This script will parse an bam file for the desired reads.
---input|i=            A bam file to pull the reads from.
---good_list=          A list of reads that you want from the bam file.
---bad_list=           A list of reads to remove from the bam file.
---output_prefix=     \$prefix.bam
---output_dir|o=       Directory for output
---Qsub|q=             <0|1> [0] 1= Submit the job to the grid.\n";
+    die "\nHELP: This script will parse an bam file for the desired reads.
+        --input|i=              A bam file to pull the reads from.
+        --good_list=            A list of reads that you want from the bam file.
+        --bad_list=             A list of reads to remove from the bam file.
+        --output|O=             /full/path/and/name/output.bam (overrides --output_dir & --output_prefix).
+        --output_dir|o=         Directory for output
+        --output_prefix|p=      /output_dir/\$prefix.bam
+        --Qsub|q=               <0|1> [0] 1= Submit the job to the grid.\n\n";
 }
 
 if ( !$options{input} ) {
@@ -30,8 +33,9 @@ if ( defined $options{Qsub} and $options{Qsub} == 1 ) { $options{sub_name} = "pa
 my ( $file, $path, $suf ) = fileparse( $options{input}, ".bam" );
 my $prefix = $options{output_prefix} ? $options{output_prefix} : "$file\_filtered";
 my $dir    = $options{output_dir}    ? $options{output_dir}    : $path;
+$dir =~ s/\/{1}$//;
 mk_dir($dir);
-my $out = "$dir\/$prefix";
+my $out = defined $options{output} ? $options{output} : "$dir\/$prefix\.bam";
 
 my %mapped_reads;    ## This is a terrible name for the hash. It is used to keep track of the reads to parse on. Ie good or bad reads depending on what is given.
 
@@ -65,12 +69,13 @@ if ( $options{good_list} || $options{bad_list} ) {
 }
 close IN;
 
-open( OUT, "| samtools view -S - -bo $out\.bam" ) or die "Unable to open output: $out\.bam because: $!\n";
-print STDERR "Opening output: $out\.bam\n";
+open( OUT, "| samtools view -S - -bo $out" ) or die "Unable to open output: $out because: $!\n";
+print STDERR "Opening output: $out\n";
 open( BAM, "-|", "samtools view -h $options{input}" ) or die "Unable to run samtools view on $options{input} because: $!\n";
-print STDERR "Starting to read through: $options{input}  parsing for the desired reads . . .\n";
+print STDERR "Starting to read through: $options{input}\nParsing for the desired reads:\n";
 while (<BAM>) {
     if ( $_ =~ /^@/ ) { print OUT; next; }    ## Print header lines
+    print_progress;
     my @f = split( /\t/, $_ );
     my $read = $f[0];
 
@@ -84,8 +89,8 @@ while (<BAM>) {
         print OUT;
     }
 }
-print STDERR "Finished parsing the BAM file.\n";
+print STDERR "\nFinished parsing the BAM file.\n";
 close BAM;
 close OUT;
-print STDERR "Finished writing: $out\.bam\n";
+print STDERR "Finished writing: $out\n";
 

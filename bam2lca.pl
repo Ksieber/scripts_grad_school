@@ -152,11 +152,13 @@ foreach my $input (@$inputs) {
     }
 }
 
+print_complete( \%options );
+
 sub help {
     die "Help: This script will take bam and find the bwa-lca.
          _____
     ____/Input\\_________________________________________________________________________________
-        --input=                <Input BAM>
+        --input=                <Input BAM> Name sorted.
         --input_list=           <List of BAMS> 1 per line.
          ______
     ____/Output\\________________________________________________________________________________

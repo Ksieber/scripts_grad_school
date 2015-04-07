@@ -34,7 +34,8 @@ use linecount;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 our %options;
 my $results
-    = GetOptions( \%options, 'input|i=s', 'lists=i', 'Qsub=s', 'output_dir=s', 'output_prefix=s', 'subdirs=s', 'sub_mem=s', 'samtools_bin=s', 'ergatis_dir=s', 'output_list=s', 'bin_dir=s', 'help|?' )
+    = GetOptions( \%options, 'input|i=s', 'lists|l=i', 'Qsub|q=s', 'output_dir|o=s', 'output_prefix|p=s', 'subdirs=s', 'sub_mem=s', 'samtools_bin=s', 'ergatis_dir=s', 'output_list=s', 'bin_dir=s',
+    'help|?' )
     or die "Error: Unrecognized command line option. Please try again.\n";
 
 if ( $options{help} ) {
@@ -57,10 +58,10 @@ if ( $options{Qsub} ) { Qsub_script( \%options ); }
 my ( $fn, $path, $suf ) = fileparse( $options{input}, ( '.list', '.txt' ) );
 if ( $path =~ /\.\// ) { chomp( $path = `pwd` ); $path = $path . "/"; }
 
-my $output_dir    = $options{output_dir}    ? $options{output_dir}    : $path;
-my $output_prefix = $options{output_prefix} ? $options{output_prefix} : $fn;
-my $subdirs       = $options{subdirs}       ? $options{subdirs}       : 0;
-if ( $subdirs == 1 ) { $output_dir = $options{output_dir} . "/$output_prefix"; }
+my $output_dir    = defined $options{output_dir}    ? $options{output_dir}    : $path;
+my $output_prefix = defined $options{output_prefix} ? $options{output_prefix} : $fn;
+my $subdirs       = defined $options{subdirs}       ? $options{subdirs}       : 0;
+if ( $subdirs == 1 ) { $output_dir = "$output_dir/$output_prefix"; }
 mk_dir("$output_dir");
 
 my $number_of_lists = $options{lists};

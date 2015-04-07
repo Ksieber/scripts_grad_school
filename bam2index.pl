@@ -28,7 +28,7 @@ $options{output_dir}    = $options{output_dir}    ? $options{output_dir}    : $p
 my $out = "$options{output_dir}\/$options{output_prefix}";
 my $Qsub = defined $options{Qsub} ? $options{Qsub} : 0;
 
-my $cmd = "samtools index $input $out\.bai";
+my $cmd = "samtools index $input";
 
 if ( $Qsub == 1 ) {
     Qsub(

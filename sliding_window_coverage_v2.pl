@@ -102,10 +102,9 @@ sub open_input {
     } @{ $lgtseq->{mpileup_suffix_list} };
 
     ## Position sorted bam
-    my @psort_bams = ( '_pos-sort.bam', '_psort.bam', 'srt.bam' );
+    my @psort_bams = ( '_pos-sort.bam', '_psort.bam', '.psort.bam', 'srt.bam' );
     map {
         if ( $suffix eq $_ ) {
-            print STDERR "FOOBAR\n";
             open( $fh, "-|", "samtools view $view $raw_input $region | samtools mpileup $mpileup - " )
                 || confess "ERROR: Can't open input: $raw_input because: $!\n";
             return $fh;

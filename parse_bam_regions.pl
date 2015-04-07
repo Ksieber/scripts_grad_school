@@ -78,7 +78,7 @@ if($options{not_sorted}){
         my($file,$dir,$suf)=fileparse($bam,".bam");
        `samtools sort $bam $dir/$file\_position_sorted`;
        &errchk($?);
-       `samtools index $dir/$file\_position_sorted.bam $dir/$file\_position_sorted.bai`;
+       `samtools index $dir/$file\_position_sorted.bam`;
        &errchk($?);
        push(@bam_list,"$dir/$file\_position_sorted.bam");
     }

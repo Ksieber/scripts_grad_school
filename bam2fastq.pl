@@ -72,9 +72,9 @@ if ( $options{Qsub} == 1 ) {
 }
 
 ## Set Defaults
-if ( !$options{no_nums} ) { $options{no_nums} = 0; }
-if ( !$options{fasta} )   { $options{fasta}   = 0; }
-if ( $options{interleaved} != 0 && $options{interleaved} != 1 ) { print STDERR "FOO\n"; $options{interleaved} = 1; }
+if ( !defined $options{no_nums} )     { $options{no_nums}     = 0; }
+if ( !defined $options{fasta} )       { $options{fasta}       = 0; }
+if ( !defined $options{interleaved} ) { $options{interleaved} = 1; }
 
 my $IN;
 if ( -e $in ) {

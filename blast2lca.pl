@@ -49,7 +49,7 @@ my $results = GetOptions(
     'help|?',
 ) or die "Error: Unrecognized command line option. Please try again.\n";
 
-use lib ( '/home/ksieber/perl5/lib/perl5/', '/local/projects-t3/HLGT/scripts/lgtseek/lib/', '/local/projects/ergatis/package-driley/lib/perl5/x86_64-linux-thread-multi/' );
+use lib ( '/home/ksieber/scripts/', '/home/ksieber/perl5/lib/perl5/', '/local/projects-t3/HLGT/scripts/lgtseek/lib/', '/local/projects/ergatis/package-driley/lib/perl5/x86_64-linux-thread-multi/' );
 use print_call;
 print_hostname( \%options );    ## This is useful for trouble shooting grid nodes that might be missing modules for LGTSeek etc.
 
@@ -113,7 +113,7 @@ print_complete( \%options );
 sub help {
     die "Help: This script will take a blast-m8 report and calculate the LCA for each unique ID.
     ----------------------------------------------------------------------------------------------------
-        --input|i=              <Input> Accepts blast -m8 reports.
+        --input|i=              <Input> Accepts blast -m8 reports. 
         --input_list=           List of blast -m8 reports, 1 file per line.
     ----------------------------------------------------------------------------------------------------
         --evalue_cutoff|e=      # For the highest evalue allowed.
@@ -132,6 +132,7 @@ sub help {
         --conf_file=            [/home/USER/.lgtseek.conf] 
         --verbose|V             <0|1> 1=Verbose reporting of progress. 0=Turns off most reports.
         --help|?
+        Note: Make sure to have ~/.lgtseek.conf taxon files the same as the blast db used.
     ----------------------------------------------------------------------------------------------------\n";
 }
 

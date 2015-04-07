@@ -6,15 +6,16 @@ use mk_dir;
 use File::Basename;
 use run_cmd;
 use POSIX;
+use Cwd;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
-my $results = GetOptions( \%options, 'input|i=s', 'threads|t=s', 'output_prefix=s', 'output_dir|o=s', 'Qsub|q=s', 'sort_mem=s', 'sub_mem=s', 'sub_mail=s', 'help|?', )
+my $results = GetOptions( \%options, 'input|i=s', 'threads|t=s', 'output_prefix|p=s', 'output_dir|o=s', 'Qsub|q=s', 'sort_mem=s', 'sub_mem=s', 'sub_mail=s', 'help|?', )
     or die "Error: Unrecognized command line option. Please try again.\n";
 
 if ( $options{help} ) {
     die "Help: This script will take a bam to sort and index it.
       --input|i=              <BAM> to sort & index
-      --output_prefix=        prefix.bam
+      --output_prefix|p=      <prefix>.bam
       --output_dir|o=         directory to put output
       --sort_mem=             [1G] RAM / thread for sort. 
       --Qsub|q=               <0|1> [0] 1= Qsub the sort. 
@@ -29,7 +30,14 @@ my $input = $options{input} ? $options{input} : $ARGV[0];
 my $lgtseek = LGTSeek->new2( \%options );
 my ( $bam, $path, $suf ) = fileparse( $input, @{ $lgtseek->{bam_suffix_list} } );
 my $prefix = $options{output_prefix} ? $options{output_prefix} : $bam;
-my $dir    = $options{output_dir}    ? $options{output_dir}    : $path;
+if ( $path =~ /\.\// ) {
+    my $cwd = getcwd;
+    if ( -e "$cwd/$bam$suf" ) {
+        $path  = $cwd;
+        $input = "$cwd/$bam$suf";
+    }
+}
+my $dir = $options{output_dir} ? $options{output_dir} : $path;
 mk_dir($dir);
 $dir =~ s/\/$//;
 my $out      = "$dir/$prefix";
@@ -48,21 +56,18 @@ if ( $Qsub == 1 ) {
     }
     Qsub(
         {   cmd      => "$sub",
-            sub_mem  => "$sort_mem",
+            sub_mem  => "$sub_mem",
             wd       => "$dir",
             sub_name => "sortBAM",
             threads  => "$threads",
             sub_mail => $options{sub_mail},
-            no_gal   => 1,
         }
     );
     die "Job submitted to the grid.\n";
 }
 
 print STDERR "+++ Sorting bam +++\n";
-my $cmd1 = "samtools sort -m $sort_mem -@ $threads $input $out\.psort";
-run_cmd($cmd1);
+run_cmd("samtools sort -m $sort_mem -@ $threads $input $out\.psort");
 print STDERR "+++ Indexing bam +++\n";
-my $cmd2 = "samtools index $out\.psort.bam $out\.psort.bai";
-run_cmd($cmd2);
+run_cmd("samtools index $out\.psort.bam");
 

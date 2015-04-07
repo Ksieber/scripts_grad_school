@@ -3,7 +3,7 @@ use warnings;
 use strict;
 use Exporter;
 our @ISA    = qw(Exporter);
-our @EXPORT = qw( print_call print_complete print_hostname print_notebook );
+our @EXPORT = qw( print_call print_complete print_hostname print_notebook print_progress);
 
 =head2 print_call
     Title       : print_call
@@ -72,6 +72,28 @@ sub print_notebook {
     }
     print OUT "\n";
     close OUT;
+}
+
+=head2 print_progress
+    Title       : print_progress
+    Usage       : while(<>){print_progress; do other stuff ... }
+    Function    : Print "." to STDERR every $cutoff through a loop to show progress is being made.
+    Args        : print_progress($cutoff) -> every $cutoff "." is printed.
+                    $cutoff default = 100000
+=cut
+
+my $counter;
+
+sub print_progress {
+    my $cut_off_opt = shift;
+    my $cut_off = defined $cut_off_opt ? $cut_off_opt : 100000;
+    $counter++;
+    if ( $counter >= ( $cut_off * 10 ) ) { $counter = 0; print STDERR "\r                                                                                        "; }
+    elsif ( $counter % $cut_off == 0 ) {
+        my $string;
+        for ( my $n = 1; $n <= ( $counter / $cut_off ); $n++ ) { $string = $string . ".\t"; }
+        print STDERR "\r$string";
+    }
 }
 
 1;

@@ -5,7 +5,6 @@ use File::Basename;
 use Bio::SeqIO;
 
 if ( -t STDIN && !@ARGV ) { &help; }
-if ( $ARGV[0] eq "-?" or $ARGV[0] eq "--help" or $ARGV[0] eq "-h" ) { &help; }
 
 ## Global Variables
 my %counts;
@@ -23,33 +22,14 @@ if ( defined $ARGV[0] ) {
     elsif ( $ARGV[0] =~ /[AaTtGgCc]+/ ) { &count( $ARGV[0] ); &print_counts; }
 }
 else {
-    chomp( my $line = <> );
+    chomp( my $line = <STDIN> );
     my @split_line = split( /\t/, $line );
-    if ( $line =~ /^>/ ) { &process_fasta( { stdin => 1 } ); }
-    elsif ( $line =~ /^@/ ) { &process_fastq( { stdin => 1 } ); }
+    if ( $line =~ /^\>/ ) { &process_fasta( { stdin => 1 } ); }
+    elsif ( $line =~ /^\@/ ) { &process_fastq( { stdin => 1 } ); }
     elsif ( @split_line >= 10 ) { &process_bam( { line => $line } ); }
-    elsif ( $_ =~ /[AaTtGgCc]/ ) { &count($line); }
-    else                         { die "Could not determine what type of file this is. Please try again.\n"; }
+    elsif ( $line =~ /[AaTtGgCc]+/ ) { &count($line); &print_counts; }
+    else                             { die "Could not determine what type of file this is. Please try again.\n"; }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 ## Subroutines
 sub process_bam {
@@ -108,18 +88,18 @@ sub clear_counts {
 
 sub print_counts {
     print "\%A: ";
-    printf "%2.1f\t", ( ( $counts{A} / $counts{total} ) * 100 );
+    printf "%5.1f\t", ( ( $counts{A} / $counts{total} ) * 100 );
     print "\%T: ";
-    printf "%2.1f\t", ( ( $counts{T} / $counts{total} ) * 100 );
-    print "\%G ";
-    printf "%2.1f\t", ( ( $counts{G} / $counts{total} ) * 100 );
-    print "\%C ";
-    printf "%2.1f\t", ( ( $counts{C} / $counts{total} ) * 100 );
+    printf "%5.1f\t", ( ( $counts{T} / $counts{total} ) * 100 );
+    print "\%G: ";
+    printf "%5.1f\t", ( ( $counts{G} / $counts{total} ) * 100 );
+    print "\%C: ";
+    printf "%5.1f\t", ( ( $counts{C} / $counts{total} ) * 100 );
     if ( $counts{N} >= 1 ) { print "\%N: "; printf "%2.1f\t", ( ( $counts{N} / $counts{total} ) * 100 ); }
     print "\%GC: ";
-    printf "%2.1f\t", ( ( ( $counts{G} + $counts{C} ) / $counts{total} ) * 100 );
+    printf "%5.1f\t", ( ( ( $counts{G} + $counts{C} ) / $counts{total} ) * 100 );
     print "%AG: ";
-    printf "%2.1f\t", ( ( ( $counts{A} + $counts{G} ) / $counts{total} ) * 100 );
+    printf "%5.1f\t", ( ( ( $counts{A} + $counts{G} ) / $counts{total} ) * 100 );
     print "Total_bp: $counts{total}\n";
 }
 

@@ -18,14 +18,9 @@ if ( $options{help} ) {
     --sub_mail=     1= email {\$user}\@som.umaryland.edu or the --sub_mail\@foo.bar     
     --log=          file to log in.
     --project=      grid project to use [jdhotopp-lab].
-    --cwd=          <0|1> [0] 1= Use current working directory. 
+    --cwd=          <0|1> [0] 1= Use Current Working Directory. 
     --wd=           Directory for grid to work from [~/].\n";
 }
-
-# my $stdin;
-# if ( !$options{cmd} ) { chomp( $stdin = <> ); }
-# my $cmd = defined $options{cmd} ? "$options{cmd}" : "$stdin";
-# if ( $cmd !~ /\w+/ ) { die "Error: Unable to determine the cmd to qsub.\n"; }
 
 if ( defined $options{cmd} ) {
     my $report = Qsub(
@@ -59,16 +54,4 @@ else {
     }
 }
 
-# my $report = Qsub(
-#     {   cmd      => $cmd,
-#         log      => $options{log},
-#         sub_name => $options{sub_name},
-#         sub_mem  => $options{sub_mem},
-#         sub_mail => $options{sub_mail},
-#         threads  => $options{threads},
-#         project  => $options{project},
-#         cwd      => $options{cwd},
-#         wd       => $options{wd}
-#     }
-# );
 

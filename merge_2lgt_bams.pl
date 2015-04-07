@@ -32,7 +32,7 @@ my $results = GetOptions(
     'draw_ref2_region=s@', 'sort1=i',          'sort2=i',         'reads_list=s',   'n_num|n=s@',    'draw_nstring=i', 'fix_orientation=i', 'titrate_refs=i',
     'titrate_n_string=i',  'M_only=i',         'MM_only=i',       'anchor_bam1=i',  'png=i',         'svg=i',          'draw_stdev|d=i',    'draw_both|B=i',
     'picard_file|P=s',     'stdev|D=i',        'insert_size|I=i', 'image_length=i', 'image_width=i', 'pad_scale=i',    'output_dir|o=s',    'output_prefix|p=s',
-    'merged_ref_name=s',   'dedup=i',          'jsd=i',           'threads|t=i',    'Qsub=i',        'sub_mem=s',      'sub_name=s',        'number_of_reads=i',
+    'merged_ref_name=s',   'dedup=i',          'jsd=i',           'threads|t=i',    'Qsub|q=i',      'sub_mem=s',      'sub_name=s',        'number_of_reads=i',
     'split_bam1_cov=i',    'split_bam2_cov=i', 'no_gal=i',        'alternative=s',  'help|?',        'min_cov=i',      'sub_mail=s',
 ) or die "Unrecognized command line option. Please try agian.\n";
 
@@ -65,7 +65,7 @@ if ( $options{titrate_refs} || $options{draw_stdev} || $options{titrate_n_string
 }
 $options{threads} = defined $options{threads} ? $options{threads} : "1";
 
-## list of regions = if a file was passed and exists ? open the file to read in all the regions    : else join all the different args breaking on ","if needed
+## list of regions = if (a file was passed and exists) ? (open the file to read in all the regions)    : (else join all the different args breaking on ","if needed)
 my @draw_ref1_region_list;
 if ( $options{draw_ref1_region} ) {
     @draw_ref1_region_list
@@ -143,7 +143,7 @@ print STDERR "======== Start: merge_2LGT_bams.pl ========\n";
 if ( !$options{bam2} && $options{ref2} ) {
     print STDERR "======== BWA map bam1 at ref2 ========\n";
     my ( $fnR, $pathR, $suffR ) = fileparse( $options{ref2}, qr/\.[^\.]+/ );
-    $options{bam2} = &bwa_align(
+    $options{bam2} = &bwa_aln(
         $options{input},
         $options{ref2},
         {   output_prefix => "$fn1\_$fnR",
@@ -245,7 +245,6 @@ foreach my $bam1_region (@bam1_region_list) {
             print STDERR "*** Warning *** Skipping empty bam1_region: $bam1_region\n";
             next;
         }
-
         my $bam2_data;
         if ( $options{bam2} ) {
             print STDERR "======== Pull bam2 data ========\n";
@@ -424,10 +423,10 @@ Title   : pull_bam_data
 Usage   : my $bam_data = pull_bam_data($bam,$region);
 Function: Extract the reads from a specific bam region and return them in an array. 
 Args    : 
-        bam         => /file/path/input.bam
+        bam             => /file/path/input.bam
         bam_region      => 'chr:100-200',
-        draw_regions  => \@draw_ref#_region,
-        log         => '/path/to/log.txt'
+        draw_regions    => \@draw_ref#_region,
+        log             => '/path/to/log.txt'
 Returns : Returns a data structure with an array of the data as well as the data stored by hash.
         'hash'          => \%bam_data_hash,
         'header'        => \@samtools_header
@@ -451,6 +450,9 @@ sub pull_bam_data {
     delete $header[-1];
     foreach my $header_lines (@header) {
         if ( $header_lines =~ /^\@HD/ ) { $header_lines =~ s/coordinate/queryname/; }
+        if ( $header_lines =~ /^\@SQ\s+SN\:[A-Za-z0-9\|\.\_]+\:\d+\-\d+\s+LN\:\d+/ ) {
+            confess "Error: This bam has a chromosome name that is invalid and will cause problems. Please remove or mask \":\\d+\-\\d+\" in the chr name: $header_lines\n";
+        }
     }
 
     my $open_cmd
@@ -1215,7 +1217,7 @@ sub merge_refs_and_map {
                 run_cmd( "bwa index $working_dir\/Merged-refs\_$out_suffix.fa 2>>$opts->{log}", $opts->{log} );
 
                 # Map the tmp bam @ the new reference.
-                &bwa_align(
+                &bwa_aln(
                     $opts->{merged_bam}->{file},
                     "$working_dir\/Merged-refs\_$out_suffix.fa",
                     {   output_prefix => "Merged\-final\_$out_suffix",

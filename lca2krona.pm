@@ -36,6 +36,7 @@ sub lca2krona {
 
     while (<$IN>) {
         chomp;
+        next if ( $_ =~ /^read_id/ );
         my @line = split( /\t/, $_ );
         my $original_lca = $line[$col];
         next if ( !$original_lca );

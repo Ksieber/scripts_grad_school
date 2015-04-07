@@ -56,7 +56,7 @@ my $min_cov       = defined $options{min_cov}       ? $options{min_cov}       : 
 ########################
 if ( $p_sort == 1 ) {
     run_cmd("samtools sort -@ $lgtseek->{threads} -m $lgtseek->{sort_mem} $input $out\.pos-sort");
-    run_cmd("samtools index $out\.pos-sort.bam $out\.pos-sort.bai");
+    run_cmd("samtools index $out\.pos-sort.bam");
     $input = "$out\.pos-sort.bam";
 }
 ########################
@@ -160,12 +160,12 @@ sub help {
     This script will take a bam file and make a text file with the unique regions of coverage.
     OUTPUT goes to STDOUT if no --output_dir or --output_prefix.
     ------------------------------------------------------------
-        --input|i=            <BAM>
+        --input|i=          <BAM>
         --pos_sort=         Sort the input bam.
         --mpileup=          <mpileup of BAM>.
         --min_cov=          Min. coverage cutoff for regions of interest.
         --make_bams=        Make bams for each region of coverage.
-        --output_dir|o=       Directory for output.
+        --output_dir|o=     Directory for output.
          --output_prefix|p=
          --subdirs=
         --help|?

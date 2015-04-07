@@ -8,7 +8,7 @@ use File::Basename;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
 my $results
-    = GetOptions( \%options, 'input|i=s', 'input_list|I=s', 'sort=s', 'threads|t=i', 'output_prefix|p=s', 'output_dir|o=s', 'Qsub|q=s', 'region=s', 'A=s', 'd=s', 'M_M=s', 'M_UM=s', 'help|?', 'ref=s', )
+    = GetOptions( \%options, 'input|i=s', 'input_list|I=s', 'sort=s', 'threads|t=i', 'output_prefix|p=s', 'output_dir|o=s', 'Qsub|q=s', 'region=s', 'A=s', 'd=s', 'M_M=s', 'M_UM=s', 'help|?', 'ref|r=s', )
     or die "Error: Unrecognized command line option. Please try again.\n";
 
 if ( $options{help} ) {
@@ -16,11 +16,11 @@ if ( $options{help} ) {
         --input=            Input bam (Position sorted)
         --input_list=       List of bams to process.
         --sort=             <0|1> [0] 1= Sort input by position. In order to calc. mpileup, the input must be position sorted.
-         --threads=          [1] # threads to use for sorting.
-         --sort_mem=         [1G] Amount of RAM to use for sorting.  
-        --ref=              Reference fasta + index. 
+         --threads=         [1] # threads to use for sorting.
+         --sort_mem=        [1G] Amount of RAM to use for sorting.  
+        --ref|r             Reference fasta + index. 
         --output_dir=       Name the directory for output.  
-         --output_prefix=    [filename] Prefix for the output file.
+         --output_prefix=   [filename] Prefix for the output file.
         --region=           chr1:100-200. Use to look @ reads only in this region. Highly recommended to use.
         --M_M=              <0|1> [0] 1= calculate Mapped_Mapped reads only. 
         --M_UM=             <0|1> [0] 1= calculate Mapped_UN-Mapped reads only. Works for LGT reads.
