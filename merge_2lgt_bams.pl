@@ -17,6 +17,7 @@ use Statistics::Distributions;
 use Statistics::R;
 use File::Basename;
 use run_cmd;
+use mk_dir;
 use print_call;
 use read_in_list;
 use bwa;
@@ -28,44 +29,29 @@ use LGTSeek;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
 my $results = GetOptions(
-    \%options,             'input|bam1=s',     'bam2=s',          'ref1=s',         'ref2=s',        'bam1_region=s@', 'bam2_region=s@',    'draw_ref1_region=s@',
-    'draw_ref2_region=s@', 'sort1=i',          'sort2=i',         'reads_list=s',   'n_num|n=s@',    'draw_nstring=i', 'fix_orientation=i', 'titrate_refs=i',
-    'titrate_n_string=i',  'M_only=i',         'MM_only=i',       'anchor_bam1=i',  'png=i',         'svg=i',          'draw_stdev|d=i',    'draw_both|B=i',
-    'picard_file|P=s',     'stdev|D=i',        'insert_size|I=i', 'image_length=i', 'image_width=i', 'pad_scale=i',    'output_dir|o=s',    'output_prefix|p=s',
-    'merged_ref_name=s',   'dedup=i',          'jsd=i',           'threads|t=i',    'Qsub|q=i',      'sub_mem=s',      'sub_name=s',        'number_of_reads=i',
-    'split_bam1_cov=i',    'split_bam2_cov=i', 'no_gal=i',        'alternative=s',  'help|?',        'min_cov=i',      'sub_mail=s',
+    \%options,             'input|bam1=s', 'bam2=s',         'ref1=s',            'ref2=s',            'bam1_region=s@',     'bam2_region=s@',  'draw_ref1_region=s@',
+    'draw_ref2_region=s@', 'sort1=i',      'sort2=i',        'reads_list=s',      'fix_orientation=i', 'titrate_n_string=i', 'MM_only=i',       'anchor_bam1=i',
+    'png=i',               'svg=i',        'draw_stdev|d=i', 'draw_both|B=i',     'picard_file|P=s',   'stdev|D=i',          'insert_size|I=i', 'image_length=i',
+    'image_width=i',       'pad_scale=i',  'output_dir|o=s', 'output_prefix|p=s', 'merged_ref_name=s', 'dedup=i',            'jsd=i',           'threads|t=i',
+    'Qsub|q=i',            'sub_mem=s',    'sub_name=s',     'number_of_reads=i', 'no_gal=i',          'help|?',             'min_cov=i',       'sub_mail=s',
+    'more_info',
 ) or die "Unrecognized command line option. Please try agian.\n";
 
-if ( $options{help} ) { &help; }    ## &help is @ the end of the script
+if ( $options{help} )      { &help; }         ## &help is at the end of the script
+if ( $options{more_info} ) { &more_info; }    ## &more_info is at the end of the script
 
-if ( !$options{input} || !$options{ref2} ) {
-    die "Error: You MUST pass ATLEAST the folowing arguements: --bam1=<lgt_bam_aln_ref1> --ref2=<some.fa> Please try agian.\n";
-}
-if ( !$options{ref1} ) { $options{ref1} = "/local/projects-t3/HLGT/references/hg19/hg19.fa"; }
+# Make sure we have the minimum inputs
+if ( !$options{input} or !$options{ref2} ) { die "Error: You MUST pass ATLEAST the folowing arguements: --bam1=<INT_bam_aln_ref1> --ref2=<some.fa> Please try agian.\n"; }
+if ( !$options{picard_file} ) { die "Error: You must pass --picard_file=<insert_size_picard_file> when you use --jsd=1. Please try again.\n"; }
 
-if ( $options{jsd} && !$options{picard_file} ) {
-    die "Error: You must pass --picard_file=<insert_size_picard_file> when you use --jsd=1. Please try again.\n";
-}
-if ( ( $options{draw_stdev} or $options{draw_nstring} ) and !$options{png} ) { $options{svg} = 1; }
-if ( $options{titrate_refs} || $options{draw_stdev} || $options{titrate_n_string} || $options{jsd} ) {
-    if ( !$options{stdev} || !$options{insert_size} ) {
-        if ( -e $options{picard_file} ) {
-            open( PIC, "<", "$options{picard_file}" )
-                or die "Error: unable to open picard_file for reading: $options{picard_file}\n";
-            my @header = <PIC> . <PIC> . <PIC> . <PIC> . <PIC> . <PIC> . <PIC>;
-            chomp( my $picard_insert_sizes = <PIC> );
-            my ( $fr_median_i_size, $fr_abs_deviation, $fr_mean_isize, $fr_stdev ) = ( split /\t/, $picard_insert_sizes )[ 0, 1, 4, 5 ];
-            $options{stdev}       = $fr_abs_deviation;
-            $options{insert_size} = $fr_median_i_size;
-        }
-        else {
-            die "Error: You must pass --stdev=<#> or --picard_file=</path/to/file.txt> when using --titrate_refs, --titrate_n_string, --jsd, --draw_stdev. Please try again.\n";
-        }
-    }
-}
-$options{threads} = defined $options{threads} ? $options{threads} : "1";
+# Ideally the user passes a bam with the reads already filtered for 1 INT
+## The user can pass a bam with region(s) to pull reads from and try to create an INT model
+## The user can specify a region to draw. This dictates both sides of the INT, but there may not be continious coverage. --draw_region overides --bam_region
+## Otherwise we will try to seperate the INT and calc each INT using &bam2regions_of_coverage.
+## &bam2regions_of_coverage is quick naive look for potential regions with INT by identifying regions for bam1/ref1 coverage and bam2/ref2 with coverage.
+## Based on the user passed or generated regions of intrest, we iterate over each region and analyze each region in-depth for INT and create a model foreach INT.
 
-## list of regions = if (a file was passed and exists) ? (open the file to read in all the regions)    : (else join all the different args breaking on ","if needed)
+# Each list of regions = if (a file was passed and exists) ? (open the file to read in all the regions) : (else join all the different regions that can be split on "," )
 my @draw_ref1_region_list;
 if ( $options{draw_ref1_region} ) {
     @draw_ref1_region_list
@@ -74,7 +60,6 @@ if ( $options{draw_ref1_region} ) {
         : split( /,/, join( ',', @{ $options{draw_ref1_region} } ) );
     $options{draw_ref1_region} = join( ',', @draw_ref1_region_list );
 }
-
 my @draw_ref2_region_list;
 if ( $options{draw_ref2_region} ) {
     @draw_ref2_region_list
@@ -83,7 +68,6 @@ if ( $options{draw_ref2_region} ) {
         : split( /,/, join( ',', @{ $options{draw_ref2_region} } ) );
     $options{draw_ref2_region} = join( ',', @draw_ref2_region_list );
 }
-
 my @bam1_region_list = undef;
 if ( $options{bam1_region} ) {
     @bam1_region_list
@@ -101,45 +85,45 @@ if ( $options{bam2_region} ) {
     $options{bam2_region} = join( ',', @bam2_region_list );
 }
 
+# Submit the job to the SGE grid
 if ( $options{Qsub} ) {
-    $options{sub_name} = defined $options{sub_name} ? $options{sub_name} : "mergeLGTbams";
+    $options{sub_name} = defined $options{sub_name} ? $options{sub_name} : "mergeINTbams";
     Qsub_script( \%options );
 }
 print_call( \%options );
 
-## Setup a few Default values
-# my $lgtseek = LGTSeek->new2(\%options);
-my $fix_orientation = defined $options{fix_orientation} ? $options{fix_orientation} : "1";
-my $draw_png        = defined $options{draw_png}        ? $options{draw_png}        : "0";
-my $dedup           = defined $options{dedup}           ? $options{dedup}           : "1";
+# Setup a few global default variables
+if ( !$options{ref1} ) { $options{ref1} = "/local/projects-t3/HLGT/references/hg19/hg19.fa"; }
+my $JSD              = defined $options{jsd}              ? $options{jsd}              : 1;
+my $MM_only          = defined $options{MM_only}          ? $options{MM_only}          : 1;
+my $dedup            = defined $options{dedup}            ? $options{dedup}            : 1;
+my $fix_orientation  = defined $options{fix_orientation}  ? $options{fix_orientation}  : 1;
+my $titrate_n_string = defined $options{titrate_n_string} ? $options{titrate_n_string} : 1;
+my $draw_nstring     = defined $options{draw_nstring}     ? $options{draw_nstring}     : 1;
+my $draw_both        = defined $options{draw_both}        ? $options{draw_both}        : 1;
+my $svg              = defined $options{draw_svg}         ? $options{draw_svg}         : 1;
+my $png              = defined $options{draw_png}         ? $options{draw_png}         : "0";
+my $min_coverage     = defined $options{min_cov}          ? $options{min_cov}          : 2;
+my $threads          = defined $options{threads}          ? $options{threads}          : 3;
 
-## Get filenames, paths, create output directory and set output names.
+# Get filenames, paths, create output directory, and set output names.
 my ( $fn1, $path1, $suff1 ) = fileparse( $options{input}, qr/\.[^\.]+/ );
 my $out_dir = $options{output_dir} ? $options{output_dir} : $path1;
-run_cmd("mkdir -p $out_dir");
-my $log = "$out_dir\/merge_2lgt_bams.log";
+mk_dir("$out_dir");
+my $log = "$out_dir\/merge_2INT_bams.log";
 run_cmd( "touch $log", $log );
 my $output_prefix = $options{output_prefix} ? $options{output_prefix} : $fn1;
 if ( $output_prefix =~ /(.+)\_psort$/ ) {
     $output_prefix = $1;    ## Remove a trailing _psort from input prefix
 }
 my $map_dir = "$out_dir/map_dir/";
-run_cmd( "mkdir -p $map_dir", $log );
+mk_dir("$map_dir");
 my $map_log = "$map_dir/log.txt";
 run_cmd( "touch $map_log", $log );
 print_notebook( \%options );
 
-my $optimize = ( $options{titrate_n_string} == 1 || $options{titrate_refs} == 1 || $options{jsd} == 1 ) ? "1" : "0";
-if ( $optimize == 1 ) {
-    $options{draw_nstring}    = 1;
-    $options{fix_orientation} = 1;
-    $options{MM_only}         = 1;
-    $options{svg}             = 1;
-    $options{draw_both}       = 1;
-    $options{anchor_left}     = defined( $options{anchor_left} ) ? $options{anchor_left} : "1";
-}
-print STDERR "======== Start: merge_2LGT_bams.pl ========\n";
 ## Map bam1 against ref2 if bam2 wasn't given.
+print STDERR "======== Start: merge_2LGT_bams.pl ========\n";
 if ( !$options{bam2} && $options{ref2} ) {
     print STDERR "======== BWA map bam1 at ref2 ========\n";
     my ( $fnR, $pathR, $suffR ) = fileparse( $options{ref2}, qr/\.[^\.]+/ );
@@ -154,18 +138,15 @@ if ( !$options{bam2} && $options{ref2} ) {
     );
 }
 
+# Coordinate sort the input bam if we need to
 my $sort1 = defined $options{sort1} ? $options{sort1} : "0";
-my $sort2 = defined $options{sort2} ? $options{sort2} : "0";
-
-# Cordinate sort if the option was passed
 if ( $sort1 == 1 ) {
     print STDERR "======== Position sort bam1 ========\n";
     run_cmd( "samtools sort -o $options{input} - | samtools view -b - > $map_dir/$fn1\_psort.bam", $map_log );
     run_cmd( "samtools index $map_dir/$fn1\_psort.bam",                                            $map_log );
     $options{input} = "$map_dir/$fn1\_psort.bam";
 }
-
-# Checking to make sure we have cordinate sorted input.
+## Check to make sure we have coordinate sorted input.
 else {
     my $header       = run_cmd("samtools view -H $options{input}");
     my @header_lines = split( /\n/, $header );
@@ -179,17 +160,20 @@ else {
     }
 }
 
-if ( $options{split_bam1_cov} == 1 ) {
+# Break apart bam1 into regions with coverage
+if ( !$options{bam1_region} ) {
     print STDERR "======== Parse regions of coverage for bam1 ========\n";
     @bam1_region_list = &bam2regions_of_coverage_v2(
         {   bam     => $options{input},
             ref     => $options{ref1},
-            min_cov => $options{min_cov},
+            min_cov => $min_coverage,
         }
     );
-    print STDERR "==== split_bam1_regions:\n@bam1_region_list\n";
 }
+print STDERR "==== split_bam1_regions:\n@bam1_region_list\n";
 
+# Coordinate sort bam2
+my $sort2 = defined $options{sort2} ? $options{sort2} : "0";
 if ( $sort2 == 1 ) {
     print STDERR "======== Position sort bam2 ========\n";
     my ( $fn2, $path2, $suff2 ) = fileparse( $options{bam2}, qr/\.[^\.]+/ );
@@ -197,18 +181,22 @@ if ( $sort2 == 1 ) {
     run_cmd( "samtools index $map_dir\/$fn2\_psort.bam",                                           $map_log );
     $options{bam2} = "$map_dir\/$fn2\_psort.bam";
 }
-if ( $options{split_bam2_cov} == 1 ) {
+
+# Break apart bam2 into regions of coverage
+if ( !$options{bam2_region} ) {
     print STDERR "======== Parse regions of coverage for bam2 ========\n";
     @bam2_region_list = &bam2regions_of_coverage_v2(
         {   bam     => $options{bam2},
             ref     => $options{ref2},
-            min_cov => $options{min_cov},
+            min_cov => $min_coverage,
         }
     );
-    print STDERR "==== split_bam2_regions:\n@bam2_region_list\n";
 }
+print STDERR "==== split_bam2_regions:\n@bam2_region_list\n";
 
-my %reads;    ## Hash of desired read id's.
+# User can also pass a list of read-ids to use in calculating the INT
+## Create a hash with the desired read-ids
+my %reads;
 if ( defined $options{reads_list} and -e $options{reads_list} ) {
     open( IN, "<", "$options{reads_list}" ) or confess "Can't open reads_list: $options{reads_list} because: $!\n";
     while (<IN>) {
@@ -218,21 +206,27 @@ if ( defined $options{reads_list} and -e $options{reads_list} ) {
     close IN;
 }
 
-### Process files
+### Process each of the INT regions
+# The bam_regions we have are naive
+## 1. Grab the reads from each bam_region
+## 2. Merge bam1_region & bam2_region reads based on their support for the INT (PE reads, read1 maps ref1 only, read2 maps ref2 only)
+## 3. Determine the model sequence and optimal distance between both sides of the INT
+## 4. Create and map the merged.bam at the calculated model(s)
+## 5. Draw the model(s)
 foreach my $bam1_region (@bam1_region_list) {
     foreach my $bam2_region (@bam2_region_list) {
         my $dir;
-        if ( $bam1_region && $bam2_region ) { $dir = "$out_dir/$bam1_region\_LGT\_$bam2_region\/"; }
+        if ( $bam1_region and $bam2_region ) { $dir = "$out_dir/$bam1_region\_INT\_$bam2_region\/"; }
         elsif ($bam1_region) { $dir = "$out_dir/$bam1_region/"; }
         elsif ($bam2_region) { $dir = "$out_dir/$bam2_region/"; }
         else                 { $dir = $out_dir; }
+        ## Cleanup the output_dir name
         $dir =~ s/:/_/g;
         $dir =~ s/\|/_/g;
         $dir =~ s/\/{2,}/\//g;
+        mk_dir("$dir");
 
-        run_cmd( "mkdir -p $dir", $log );
-
-        # Grab important bam data from region of interest
+        # 1. Grab important bam data from region1 of interest
         print STDERR "======== Pull bam1 data ========\n";
         my $bam1_data = &pull_bam_data(
             {   bam          => $options{input},
@@ -261,6 +255,7 @@ foreach my $bam1_region (@bam1_region_list) {
             }
         }
 
+        # Create a bam with reads for this INT only
         print STDERR "======== Merge bams ========\n";
         my $merged_bam = &merge_bams(
             {   bam1_data  => $bam1_data,
@@ -274,13 +269,13 @@ foreach my $bam1_region (@bam1_region_list) {
             run_cmd( "rm -rf $dir", $log );
             next;
         }
-        print STDERR "======== Create new LGT-Ref ========\n";
+        print STDERR "======== Create new INT-Ref ========\n";
 
         my $ref1;
         my $ref2;
-        ## After this bam1 is always the "left" bam
-        if ( $optimize == 1 || $options{fix_orientation} == 1 ) {
-            print STDERR "======== Fix LGT-Ref Orientation ========\n";
+        ## After this bam1 is always the "left"/5'/upstream bam
+        if ( $fix_orientation == 1 ) {
+            print STDERR "======== Fix INT-Ref Orientation ========\n";
             ( $bam1_data, $ref1, $bam2_data, $ref2 ) = &fix_orientation(
                 {   merged_bam => $merged_bam,
                     bam1_data  => $bam1_data,
@@ -291,86 +286,56 @@ foreach my $bam1_region (@bam1_region_list) {
             );
         }
 
-        ##
-        my $ref1_data_list;
-        my $ref2_data_list;
-        my @n_num_list;
-        if ( $optimize == 1 ) {
-            print STDERR "======== Pull LGT-Ref Seq && Calculate Optimal LGT-Ref Spacing ========\n";
-            ( $ref1_data_list, $ref2_data_list, @n_num_list ) = &optimize_refs(
-                {   titrate_refs     => $options{titrate_refs},
-                    titrate_n_string => $options{titrate_n_string},
-                    bam1_data        => $bam1_data,
-                    bam2_data        => $bam2_data,
-                    merged_bam       => $merged_bam,
-                    ref1             => $ref1,
-                    ref2             => $ref2,
-                    picard_file      => $options{picard_file},
-                    insert_size      => $options{insert_size},
-                    stdev            => $options{stdev},
-                    jsd              => $options{jsd},
-                    output_dir       => $dir,
-                    anchor_bam1      => $options{anchor_bam1},
-                    n_num            => $options{n_num},
-                    log              => $log,
-                }
-            );
-        }
-        else {
-            print STDERR "======== Pull LGT-Ref Seq ========\n";
+        # 2. Determine the sequences and size of the INT
+        ## Calculate the optimal distance between the two sides of the INT using the AD & JSD
+        print STDERR "======== Calculate optimal INT distance and sequence ========\n";
+        my ( $ref1_data_list, $ref2_data_list, @n_num_list ) = &optimize_refs(
+            {   bam1_data        => $bam1_data,
+                bam2_data        => $bam2_data,
+                merged_bam       => $merged_bam,
+                ref1             => $ref1,
+                ref2             => $ref2,
+                picard_file      => $options{picard_file},
+                insert_size      => $options{insert_size},
+                stdev            => $options{stdev},
+                jsd              => $JSD,
+                titrate_n_string => $titrate_n_string,
+                MM_only          => $MM_only,
+                output_dir       => $dir,
+                log              => $log,
+            }
+        );
 
-            # Grab ref seq. for each
-            $ref1_data_list = &pull_ref_data(
-                {   ref        => $options{ref1},
-                    ref_region => \@draw_ref1_region_list,
-                    bam_data   => $bam1_data,
-                    merged_ids => \$merged_bam->{ids},
-                }
-            );
-
-            ## Make return multiple refs & take list of ref regions
-            $ref2_data_list = &pull_ref_data(
-                {   ref        => $options{ref2},
-                    ref_region => \@draw_ref2_region_list,
-                    bam_data   => $bam2_data,
-                    merged_ids => \$merged_bam->{ids},
-                }
-            );
-            @n_num_list
-                = ( defined $options{n_num} && @{ $options{n_num} } > 1 )
-                ? push( @n_num_list, split( /,/, join( ',', @{ $options{ref1_region} } ) ) )
-                : "0";
-        }
-
-        ## Make return multiple refs & take list of ref regions
-        ## Move optimize into here
-        print STDERR "======== Map LGT-Merged-Bam at New-LGT-Ref ========\n";
+        # 4. Create and map the reads at the INT model
+        print STDERR "======== Map INT-Merged-Bam at New-INT-Ref ========\n";
         my @bams_mapped_at_merged_refs_list = &merge_refs_and_map(
             {   bam1_data   => $bam1_data,
                 bam2_data   => $bam2_data,
                 ref1_region => $ref1_data_list,
                 ref2_region => $ref2_data_list,
                 merged_bam  => $merged_bam,
-                min_cov     => $options{min_cov},
+                min_cov     => $min_coverage,
                 n_num       => \@n_num_list,
                 output_dir  => $dir,
                 log         => $log,
             }
         );
-        print STDERR "======== Draw New Mapping LGT-bam at LGT-Ref ========\n";
+
+        # 5. Draw the INT model
+        print STDERR "======== Draw New Mapping INT-bam at INT-Ref ========\n";
         foreach my $set (@bams_mapped_at_merged_refs_list) {
             ## Iterate to draw both STDEV & Normal img's if --draw_both
-            if ( $options{draw_both} ) {
+            if ( $draw_both == 1 ) {
                 ## First draw the "normal" img
                 &draw_img(
                     {   ref_data      => $set->{ref_data},
                         bam           => $set->{bam}->{file},
                         output_dir    => $set->{bam}->{dir},
                         output_prefix => $set->{bam}->{prefix},
-                        png           => $options{png},
-                        svg           => $options{svg},
+                        png           => $png,
+                        svg           => $svg,
                         draw_stdev    => "0",
-                        draw_nstring  => $options{draw_nstring},
+                        draw_nstring  => $draw_nstring,
                     }
                 );
                 ## Second draw the color coded img
@@ -379,29 +344,29 @@ foreach my $bam1_region (@bam1_region_list) {
                         output_dir    => $set->{bam}->{dir},
                         output_prefix => "$set->{bam}->{prefix}\_stdev",
                         ref_data      => $set->{ref_data},
-                        png           => $options{png},
-                        svg           => $options{svg},
+                        png           => $png,
+                        svg           => $svg,
                         draw_stdev    => "1",
                         stdev         => $options{stdev},
                         insert_size   => $options{insert_size},
                         picard_file   => $options{picard_file},
-                        draw_nstring  => $options{draw_nstring},
+                        draw_nstring  => $draw_nstring,
                     }
                 );
             }
-            elsif ( $options{png} || $options{svg} ) {
+            elsif ( $options{png} or $options{svg} ) {
                 &draw_img(
                     {   bam           => $set->{bam}->{file},
                         output_dir    => $set->{bam}->{dir},
                         output_prefix => $set->{bam}->{prefix},
                         ref_data      => $set->{ref_data},
-                        png           => $options{png},
-                        svg           => $options{svg},
+                        png           => $png,
+                        svg           => $svg,
                         draw_stdev    => $options{draw_stdev},
                         stdev         => $options{stdev},
                         insert_size   => $options{insert_size},
                         picard_file   => $options{picard_file},
-                        draw_nstring  => $options{draw_nstring},
+                        draw_nstring  => $draw_nstring,
                     }
                 );
             }
@@ -409,6 +374,8 @@ foreach my $bam1_region (@bam1_region_list) {
     }
 }
 
+
+run_cmd("rm -rf $map_dir");
 print_complete( \%options );
 ## Done processing
 
@@ -428,11 +395,11 @@ Args    :
         log             => '/path/to/log.txt'
 Returns : Returns a data structure with an array of the data as well as the data stored by hash.
         'file'          => /file/path/input.bam
-        'hash'          => \%bam_data_hash,
+        'id_hash'       => \%bam_data_hash,             ## $bam_data->{id_hash}->{$id}=$corresponding_bam_line_data
         'header'        => \@samtools_header
         'strand'        => Integer. Positive means more reads map to + strand.
         'bam_region'    => 'chr:100-200'
-        'draw_regions'  => \@draw_ref#_region,
+        'draw_regions'  => \@draw_ref#_region,          ## This links --draw_region to the object, allowing us to switch bam1 <-> bam2 later depending on the orientation and maintain the proper --draw_region <-> bam relationship
 =cut
 
 sub pull_bam_data {
@@ -474,10 +441,12 @@ sub pull_bam_data {
     close BAM;
 
     my $retval = {
+        'file'         => "$opts->{bam}",
         'id_hash'      => \%bam_data,
         'header'       => \@header,
         'empty'        => "0",
         'draw_regions' => $opts->{draw_regions},
+        'bam_region'   => $opts->{bam_region},
     };
     return $retval;
 }
@@ -485,19 +454,21 @@ sub pull_bam_data {
 =head1
 
 Title   : merge_bams
-Usage   : 
-Function:  
-Args    : 
-        
-        
-Returns : 
-    {
-        file        => $ret_bam,
-        ids         => $merged_ids,         # %Hash
-        count       => $count,
-        bam1_strand => $bam1_orientation,
-        bam2_strand => $bam2_orientation,
-    };
+Function: Create a bam with reads supporting an INT    
+Usage   : my $merged_bam = &merge_bams(
+            {   bam1_data  => $bam1_data,           ## pull_bam_data object
+                bam2_data  => $bam2_data,           ## pull_bam_data object
+                dedup      => $dedup,               ## <0|1> 1= dereplicate the data with picard
+                output_dir => "$dir/merged_bams/"
+            }
+Returns : my $merged_bam = 
+            {
+                file        => $ret_bam,
+                ids         => $merged_ids,        ## $hash{$ids}
+                count       => $count,
+                bam1_strand => $bam1_orientation,
+                bam2_strand => $bam2_orientation,
+            };
 
 =cut
 
@@ -505,12 +476,12 @@ sub merge_bams {
     my $opts      = shift;
     my $bam1_data = $opts->{bam1_data};
     my $bam2_data = $opts->{bam2_data};
-    run_cmd( "mkdir -p $opts->{output_dir}", $log );
+    mk_dir("$opts->{output_dir}");
 
     # Grab ID's present & mapping in both
     my $merged_ids = &merge_hash_ids( [ $bam1_data->{id_hash}, $bam2_data->{id_hash} ] );
 
-    # Create a fake header for the tmp sam
+    # Create a header for the tmp sam
     open( SAM, ">", "$opts->{output_dir}\/Merged-reads-only.sam" )
         or confess "Error: Couldn't open output merged.sam: $opts->{output_dir}/Merged-reads-only.sam";
     print SAM @{ $bam1_data->{header} };
@@ -555,8 +526,8 @@ sub merge_bams {
     my $ret_bam = "$opts->{output_dir}\/Merged-reads-only.bam";
 
     if ( $opts->{dedup} == 1 ) {
-        my $lgtseek      = LGTSeek->new2();
-        my $filtered_bam = $lgtseek->prinseqFilterBam(
+        my $LGTseq       = LGTSeek->new2();
+        my $filtered_bam = $LGTseq->prinseqFilterBam(
             {   input_bam    => "$opts->{output_dir}\/Merged-reads-only.bam",
                 output_dir   => "$opts->{output_dir}",
                 rm_low_cmplx => "0",
@@ -566,7 +537,7 @@ sub merge_bams {
         $ret_bam = $filtered_bam->{bam};
 
         run_cmd("samtools view $ret_bam | cut -f1 | sort -u > $opts->{output_dir}\/Post_dedup_good_ids.list");
-        my $good_ids_hash = $lgtseek->_read_ids( { list => "$opts->{output_dir}\/Post_dedup_good_ids.list" } );
+        my $good_ids_hash = $LGTseq->_read_ids( { list => "$opts->{output_dir}\/Post_dedup_good_ids.list" } );
         run_cmd("rm $opts->{output_dir}\/Post_dedup_good_ids.list");
 
         foreach my $id ( keys %$merged_ids ) {
@@ -592,7 +563,7 @@ Title   : pull_ref_data
 Usage   : my $ref_data_list = pull_ref_data($bam_data_in_array,@draw_ref_region_list);
 Function: Extract the reference sequence from a specific fasta region for all ref_regions
 Args    : 
-        ref         =>  <file>              {Mandatory}{Priority}
+        ref         =>  <file>              {Mandatory}
         ref_region  =>  <@array_ref>        {Optional} {Priority}
         bam_data    =>  <object>            {Mandatory}
         merged_ids  =>  <hash>              {Mandatory}
@@ -602,7 +573,7 @@ Returns : array_of_hashes{'seq' => ref_seq_string, 'range' => 'actual_chr:100-20
 
 sub pull_ref_data {
     my $opts = shift;
-    if ( !$opts->{ref} || !$opts->{bam_data} || !$opts->{merge_ids} ) {
+    if ( !$opts->{ref} or !$opts->{bam_data} or !$opts->{merge_ids} ) {
         confess "Error: &pull_ref_data must have the following args passed: ref, bam_data, & merged_ids. Please try again.\n";
     }
     if ( &empty_chk( $opts->{ref} ) == 1 ) {
@@ -623,7 +594,7 @@ sub pull_ref_data {
 
             # Pull the region from the fasta reference
             my $ref_db = Bio::DB::Fasta->new( $opts->{ref} );
-            my $seq = $ref_db->seq( $ref_chr, $ref_lower_range => $ref_upper_range );
+            my $seq = ( $opts->{bam_data}->{rvcmplt} == 1 ) ? $ref_db->seq( $ref_chr, $ref_upper_range => $ref_lower_range ) : $ref_db->seq( $ref_chr, $ref_lower_range => $ref_upper_range );
 
             push(
                 @ref_data,
@@ -662,7 +633,7 @@ sub pull_ref_data {
             }
         }
 
-        # Use reference region is it exist.
+        # Use reference region if it exist.
         my $actual_lower_range
             = defined $opts->{ref_region}
             ? $ref_lower_range
@@ -675,7 +646,8 @@ sub pull_ref_data {
 
         # Finally, pull the region from the fasta reference
         my $ref_db = Bio::DB::Fasta->new( $opts->{ref} );
-        my $seq = $ref_db->seq( $actual_chr, $actual_lower_range => $actual_upper_range );
+        my $seq
+            = ( $opts->{bam_data}->{rvcmplt} == 1 ) ? $ref_db->seq( $actual_chr, $actual_upper_range => $actual_lower_range ) : $ref_db->seq( $actual_chr, $actual_lower_range => $actual_upper_range );
 
         push(
             @ref_data,
@@ -757,7 +729,7 @@ sub fix_orientation {
     my $opts = shift;
     my ( $bam1_data, $ref1, $bam2_data, $ref2 );
 
-    ## Fix orientation based on majority of the sequencing reads if the options is passed
+    ## Fix orientation based on majority of the sequencing reads
     if ( $opts->{merged_bam}->{bam1_strand} <= 0 && $opts->{merged_bam}->{bam2_strand} >= 0 ) {
         $bam1_data            = $opts->{bam2_data};
         $ref1                 = $opts->{ref2};
@@ -795,38 +767,58 @@ sub fix_orientation {
 
 =head1
 
-Title   : optimize_refs
-Usage   : ( $ref1_data_list, $ref2_data_list, @n_num_list ) = &optimize_refs(
-                        {   titrate_refs     => $options{titrate_refs},
-                            bam1_data         => $bam1_data,
+Title   : &optimize_refs
+Function: Calculate the ideal distance between the two integration (INT) references (refs) based on insert size (i_size). 
+Returns : A list of of reference positions and a # of bp between both references to draw to illustrate the optimized INT configuration.
+Usage   : my ( $ref1_data_list, $ref2_data_list, @n_num_list ) = &optimize_refs(
+                        {   bam1_data         => $bam1_data,
                             bam2_data         => $bam2_data,
                             merged_bam        => $merged_bam,
                             ref1              => $ref1,
                             ref2              => $ref2,
-                            insert_size       => $options{insert_size},
-                            stdev             => $options{stdev},
-                            output_dir        => $out_dir
+                            picard_file       => /path/to/LIB_picard_insert_size_metrics.txt
+                            output_dir        => /path/for/output/
                         )};
 
-Function: Calculate the ideal distance between the two ref based on insertsize. Then titrate around ideal to illustrate.
 Args    : 
-            titrate_refs      => $options{titrate_refs},
-            titrate_n_string  => $options{titrate_n_string},
-            bam1_data         => $bam1_data,
-            bam2_data         => $bam2_data,
-            merged_bam        => $merged_bam,
-            ref1              => $ref1,
-            ref2              => $ref2,
-            picard_file       => /path/to/picard_insert_size_metrics.txt
-            insert_size       => $options{insert_size},
-            stdev             => $options{stdev},
-            number_of_reads   => $options{number_of_reads},
-            output_dir        => $out_dir,
-            anchor_bam1       => $options{anchor_bam1},
-            n_num             => $options{n_num},
+            bam1_data         => $bam1_data             ( &pull_bam_data object )
+            bam2_data         => $bam2_data             ( &pull_bam_data object )
+            merged_bam        => $merged_bam            ( &merge_Bams object )
+            ref1              => /path/to/ref_1.fa
+            ref2              => /path/to/ref_2.fa
+            picard_file       => /path/to/picard_insert_size_metrics.txt for LIB
+            output_dir        => /path/for/output,
+            MM_only           => <0|1> 1= Only use reads pairs that have both pairs map to the merged refernce
+            jsd               => <0|1> 1= Use Jensen-Shannon Distance calculations to determine distance between the 2 INT refs.
+            titrate_n_string  => <0|1> 1= Titrated the LIB_stdev distances between the 2 refs for visualizing opti distance. 
+            insert_size       => LIB insert size    (overrides picard file parsing)
+            stdev             => LIB stdev          (overrides picard file parsing)
             log               => $log,
 
-Returns : 
+Workflow:
+            1. Init LIB i_size counts
+            2. Init INT i_size counts when INT refs are adjacent
+                2A. Create a reference with zero bases between ( "N_0" ) the two sides of the integration refs
+                2B. Map merged.bam @ N_0 ref we created (2A). Calc INT i_sizes.
+                2C. Init INT i_size counts from the picard file (2B).
+            3. Titrate the optimal distance between the two references using JSD and AD
+            4. Return a list of the ref sequences and opti-N
+
+Input object structure:
+        pull_bam_data object:
+            'file'              => /file/path/input.bam
+            'id_hash'           => \%bam_data_hash,             ## $bam_data->{id_hash}->{$id}=$corresponding_bam_line_data
+            'header'            => \@samtools_header
+            'strand'            => Integer. Positive means more reads map to + strand.
+            'bam_region'        => 'chr:100-200'
+            'rvcmplt'           => <0|1>
+
+        merge_Bams object:
+            'file'              => /path/to/file.bam,
+            'ids'               => $hash{$ids}
+            'count'             => number of reads,
+            'bam1_strand'       => #, > 0 = more reads map positive strand, < 0 more reads map to the reverse strand
+            'bam2_strand'       => #
 
 =cut
 
@@ -841,20 +833,52 @@ sub optimize_refs {
         confess "Error: Must pass &optimize_refs the following opts: bam1_data, bam2_data, ref1, ref2, merged_ids\n";
     }
 
-    my $bam1_data = $opts->{bam1_data};
-    my $bam2_data = $opts->{bam2_data};
-    my $ref1_data;
-    my $ref2_data;
+    # Local variables
+    my $bam1_data           = $opts->{bam1_data};
+    my $bam2_data           = $opts->{bam2_data};
+    my $merged_bam          = $opts->{merged_bam};
+    my $MM_only             = defined $opts->{MM_only} ? $opts->{MM_only} : "1";
+    my $jsd                 = defined $opts->{jsd} ? "$opts->{jsd}" : "0";
+    my $tmp_optimal_ref_dir = "$opts->{output_dir}/tmp_optimal_ref_dir/";
+    mk_dir($tmp_optimal_ref_dir);
 
+    # Data to return
+    my @ret_ref1_data_list;
+    my @ret_ref2_data_list;
+    my @n_num_list;
+
+    # 1. Initialize count of the LIB i_size population
+    ## This is based on the picard file for the LIB mapped at the appropriate reference
+    my %LIB_count;
+    my $LIB_stdev;
+    my $LIB_median_insert_size;
+    open( PIC, "<", "$opts->{picard_file}" )
+        or confess "Error: Unable to open picard_file for reading: $opts->{picard_file}\n";
+    my @header = <PIC> . <PIC> . <PIC> . <PIC> . <PIC> . <PIC> . <PIC>;
+    chomp( my $picard_insert_sizes = <PIC> );
+    my ( $fr_median_i_size, $fr_abs_deviation, $fr_mean_INT_i_sizes, $fr_stdev ) = ( split /\t/, $picard_insert_sizes )[ 0, 1, 4, 5 ];
+    $LIB_stdev              = defined $opts->{stdev}       ? $opts->{stdev}       : $fr_abs_deviation;
+    $LIB_median_insert_size = defined $opts->{insert_size} ? $opts->{insert_size} : $fr_median_i_size;
+    my $foobar = <PIC> . <PIC> . <PIC> . <PIC> . <PIC>;
+
+    while (<PIC>) {
+        next if ( $_ !~ /^\d+/ );
+        my ( $i_size, $fr, $rf, $tandem ) = split( /\t/, $_ );
+        $LIB_count{$i_size} = $fr;
+    }
+    close PIC;
+
+    # 2. Initilize a count of the INT insert-size population with 0 bp between the two references ( N_0 )
+    # 2A Pull the coordinates from the bam reads that aligned to the reference and pull cooresponding ref sequences
+    my $adjacent_model_fa = "$tmp_optimal_ref_dir/adjacent_model_refs.fa";
     my $bam1_chr;
     my $bam2_chr;
     my @r1_length_list;
     my @r2_length_list;
     my @bam1_position_list;
     my @bam2_position_list;
-    my $jsd = defined $opts->{jsd} ? "$opts->{jsd}" : "0";
 
-    foreach my $id ( keys %{ $opts->{merged_bam}->{ids} } ) {
+    foreach my $id ( keys %{ $opts->{merged_bam}->{ids} } ) {    ## iterate through bam lines of data based on the read-id from the list of read-ids to be merged
         my $bam1_line = $bam1_data->{id_hash}->{$id};
         my $bam2_line = $bam2_data->{id_hash}->{$id};
 
@@ -874,36 +898,108 @@ sub optimize_refs {
     my ( $bam1_max, $bam1_min ) = Math::NumberCruncher::Range( \@bam1_position_list );
     my ( $bam2_max, $bam2_min ) = Math::NumberCruncher::Range( \@bam2_position_list );
 
+    # Calculate average read lengths
     my $r1_length = Math::NumberCruncher::Mean( \@r1_length_list );
     my $r2_length = Math::NumberCruncher::Mean( \@r2_length_list );
 
-    my $bam1_max_adj = $bam1_max + ( $r1_length - 1 );      ## Subtract 1 b/c zero based counting
-    my $bam2_max_adj = $bam2_max + ( $r2_length - 1 );      ## Subtract 1 b/c zero based counting
+    # Calculate furthest downstream (3') side of each side of the INT
+    my $bam1_max_adj = $bam1_max + ( $r1_length - 1 );    ## Subtract 1 b/c zero based counting
+    my $bam2_max_adj = $bam2_max + ( $r2_length - 1 );    ## Subtract 1 b/c zero based counting
 
-    my @Isize;
-    foreach my $id ( keys %{ $opts->{merged_bam}->{ids} } ) {
-        my $bam1_line     = $bam1_data->{id_hash}->{$id};
-        my $bam2_line     = $bam2_data->{id_hash}->{$id};
-        my $bam1_position = ( split /\t/, $bam1_line )[3];
-        my $bam2_position = ( split /\t/, $bam2_line )[3];
-        push( @Isize, ( 1 + $bam1_max_adj - $bam1_position ) + ( 1 + ( $bam2_position + ( $r2_length - 1 ) ) - $bam2_min ) );
+    # Determine the region of the INT foreach side of the INT
+    my $bam1_region_0 = ( $bam1_data->{rvcmplt} == 1 ) ? "$bam1_chr\:$bam1_max_adj\-$bam1_min" : "$bam1_chr\:$bam1_min\-$bam1_max_adj";
+    my $bam2_region_0 = ( $bam2_data->{rvcmplt} == 1 ) ? "$bam2_chr\:$bam2_max_adj\-$bam2_min" : "$bam2_chr\:$bam2_min\-$bam2_max_adj";
+
+    # Create merged N_0 reference, denoting if a sequence was reverse complemented.
+    if ( $bam1_data->{rvcmplt} == 1 ) {
+        open( OUT, ">", "$opts->{output_dir}/REVERSE_COMPLEMENTED_$bam1_region_0.txt" )
+            or confess "Error: Unable to open output: $opts->{output_dir}/REVERSE_COMPLEMENTED.txt\n";
+        print OUT "REVERSE_COMPLEMENTED: $bam1_region_0\n";
+        close OUT;
+    }
+    if ( $bam2_data->{rvcmplt} == 1 ) {
+        open( OUT, ">", "$opts->{output_dir}/REVERSE_COMPLEMENTED_$bam2_region_0.txt" )
+            or confess "Error: Unable to open output: $opts->{output_dir}/REVERSE_COMPLEMENTED.txt\n";
+        print OUT "REVERSE_COMPLEMENTED: $bam2_region_0\n";
+        close OUT;
     }
 
-    my %pop_count;
-    if ( $jsd == 1 ) {
-        open( PIC, "<", "$opts->{picard_file}" )
-            or confess "Error: Unable to open picard_file for reading: $options{picard_file}\n";
-        my @header              = <PIC> . <PIC> . <PIC> . <PIC> . <PIC> . <PIC> . <PIC>;
-        my @picard_insert_sizes = <PIC> . <PIC> . <PIC>;
-        my $foobar              = <PIC> . <PIC> . <PIC>;
-        while (<PIC>) {
-            next if ( $_ !~ /^\d+/ );
-            my ( $i_size, $fr, $rf, $tandem ) = split( /\t/, $_ );
-            $pop_count{$i_size} = $fr;
+    # Create Bio::DB ojbect to parse the sequence of each INT region
+    my $ref_1_db = Bio::DB::Fasta->new( $opts->{ref1} );
+    my $ref_2_db = Bio::DB::Fasta->new( $opts->{ref2} );
+
+    # Pull the reference data foreach side of the INT
+    my $seq_1
+        = ( $bam1_data->{rvcmplt} == 1 )
+        ? $ref_1_db->seq( $bam1_chr, $bam1_max_adj => $bam1_min )
+        : $ref_1_db->seq( $bam1_chr, $bam1_min     => $bam1_max_adj );
+
+    my $seq_2
+        = ( $bam2_data->{rvcmplt} == 1 )
+        ? $ref_2_db->seq( $bam2_chr, $bam2_max_adj => $bam2_min )
+        : $ref_2_db->seq( $bam2_chr, $bam2_min     => $bam2_max_adj );
+
+    # Now that we have the sequence and region for both INT references, add them to the list of data to return
+    push(
+        @ret_ref1_data_list,
+        {   'seq'   => $seq_1,
+            'range' => $bam1_region_0,
         }
-        close PIC;
-    }
+    );
+    push(
+        @ret_ref2_data_list,
+        {   'seq'   => $seq_2,
+            'range' => $bam2_region_0,
+        }
+    );
+    push( @n_num_list, "0" );
 
+    # Create a merged reference for the INT with N=0. This will allow us to accurately calculate the i_size for the INT with N=0.
+    open( my $REF, ">", $adjacent_model_fa ) or die "Error: &optimize_refs unable to open output model reference: $adjacent_model_fa\n";
+    ## Print fasta header
+    print $REF ">adjacent_model_ref::$bam1_region_0\__$bam2_region_0\n";
+    ## Print fasta sequence
+    print $REF $seq_1 . $seq_2 . "\n";
+    close $REF;
+
+    # 2B. Map the merged bam at the merged_N0_reference
+    ## bwa index merged_N0_reference
+    run_cmd("bwa index $adjacent_model_fa");
+    ## bwa align & use Picard to calculate the i_size for the merged INT reads
+    my $adjacent_model_refs_bam = &bwa_aln(
+        $opts->{merged_bam}->{file},
+        $adjacent_model_fa,
+        {   output_prefix  => "adjacent_model_refs",
+            output_dir     => $tmp_optimal_ref_dir,
+            insert_metrics => 1,
+            MM_only        => $MM_only,
+            cmd_log        => 1
+        }
+    );
+
+    # 2C. Init INT_count by parsing the i_size data from the picard file for N_0
+    my $adjacent_model_refs_insert_size_file = "$tmp_optimal_ref_dir/adjacent_model_refs\_std_insert.metrics";
+    my @INT_i_sizes;
+    open( PIC, "<", "$adjacent_model_refs_insert_size_file" )
+        or confess "Error: Unable to open picard_file for reading: $adjacent_model_refs_insert_size_file\n";
+
+    # Ignore header stuff in picard file
+    my @INT_header              = <PIC> . <PIC> . <PIC> . <PIC> . <PIC> . <PIC> . <PIC>;
+    my @INT_picard_insert_sizes = <PIC> . <PIC> . <PIC>;
+    my $INT_foobar              = <PIC> . <PIC> . <PIC>;
+
+    # Start reading the INT i_size data from the merged_N0_reference.bam picard file
+    while (<PIC>) {
+        next if ( $_ !~ /^\d+/ );
+        my ( $i_size, $fr, $rf, $tandem ) = split( /\t/, $_ );
+        for ( my $i = 1; $i <= $fr; $i++ ) {
+            push( @INT_i_sizes, $i_size );
+        }
+    }
+    close PIC;
+
+    # 3. Titrate the optimal distance between the two sides of the INT
+    ## Open the output we will print the AD & JSD calculations to
     open( VAR, ">", "$opts->{output_dir}\/Variance_from_avg.txt" )
         or confess "Error: Unable to open output file: $opts->{output_dir}/Variance_from_avg.tx";
     ## Print Header
@@ -912,33 +1008,34 @@ sub optimize_refs {
     if ( $jsd == 1 ) { printf VAR ( "%-20s%-20s%-20s", "JSD", 'ci_min', 'ci_max' ); }
     print VAR "\n";
 
-    my %tprob_titration;
-    my %jsd_titration;
-    my %variance_titration;
+    # Local hash variables to store the titration data
+    my %AD_titration;     ##  AD{$N} = calc_AD_at_N
+    my %jsd_titration;    ## JSD{$N} = calc_JSD_at_N
 
+    # Titrate 0-100 bp between the INT refs, calculate the AD & JSD.
     for ( my $N = 0; $N <= 100; $N++ ) {
-        my @adjusted_insert_size;    ## Read length + #N bp inbetween
-        my @variance_N_list;         ## "variance" meaning the difference between each read's i_size w/ N's bp inbetween & the populations's i_size
-        my %model_count;
-        foreach my $insert (@Isize) {
+        my @adjusted_insert_size;    ## INT_i_size + #_N bp between the two refs
+        my @diff_N_list;             ## difference between the LIB_median_i_size and each INT_read_i_size w/ #_N's bp between the refs
+        my %INT_count;               ## Same data structure as LIB_count
+        foreach my $insert (@INT_i_sizes) {
             push( @adjusted_insert_size, ( $insert + $N ) );
-            $model_count{ ( $insert + $N ) }++;
-            push( @variance_N_list, ( abs( $insert + $N - $opts->{insert_size} ) ) );
+            $INT_count{ ( $insert + $N ) }++;
+            push( @diff_N_list, ( abs( $insert + $N - $LIB_median_insert_size ) ) );
         }
-        ## Calculate average number of bases different than the population
-        my $avg_N_variance = Math::NumberCruncher::Mean( \@variance_N_list );
-        $variance_titration{$N} = $avg_N_variance;
-        printf VAR ( "%-20s%-20.3f", "$N", "$avg_N_variance" );
+        ## Calculate the Average Difference
+        my $avg_diff_N = Math::NumberCruncher::Mean( \@diff_N_list );
+        $AD_titration{$N} = $avg_diff_N;
+        printf VAR ( "%-20s%-20.3f", "$N", "$avg_diff_N" );
 
-        ## Calculate the Jensen-Shannon Divergence
+        ## Calculate the Jensen-Shannon Distance
         if ( $jsd == 1 ) {
-            ## Load packages to calculate Jensen-Shannon Distance between populations
+            ## Load functions into R to calculate the JSD
             my $R = Statistics::R->new( r_bin => '/usr/local/bin/R' );
             $R->run('require(boot)');
             $R->run(
                 'calc_JSD <- function(inMatrix, pseudocount=0.0000001, ...) {
                                 KLD <- function(x,y) { sum(x *log(x/y)) }
-                                JSD<- function(x,y) { sqrt(0.5 * KLD(x, (x+y)/2) + 0.5 * KLD(y, (x+y)/2)) }
+                                JSD <- function(x,y) { sqrt(0.5 * KLD(x, (x+y)/2) + 0.5 * KLD(y, (x+y)/2)) }
                                 matrixColSize <- length( colnames( inMatrix ) )
                                 matrixRowSize <- length( rownames( inMatrix ) )
                                 colnames <- colnames( inMatrix )
@@ -956,19 +1053,24 @@ sub optimize_refs {
                                 return( resultsMatrix )
                             }'
             );
+            $R->run(
+                'calc_JSD_boot_fxn <- function (x_df, index) {
+                            tmp_df <- data.frame(x_df[,1],x_df[index,2])
+                            return( calc_JSD(tmp_df) )
+                            }'
+            );
 
-            ## Initialize ref & model
-            $R->run('ref_count   = numeric()');
-            $R->run('model_count = numeric()');
-            foreach my $key ( sort { $a <=> $b } keys %pop_count ) {
-                my $pop_isize_count = $pop_count{$key};
-                my $model_isize_count = defined $model_count{$key} ? $model_count{$key} : "0.0000001";
-                ## Add the pop and model count of each insert size to the matrix by col.
-                $R->run("ref_count   = c( ref_count,   $pop_isize_count   )");
-                $R->run("model_count = c( model_count, $model_isize_count )");
+            ## Initialize R data.frame with LIB & INT count of i_size in R
+            $R->run('LIB_count = numeric()');
+            $R->run('INT_count = numeric()');
+            foreach my $key ( sort { $a <=> $b } keys %LIB_count ) {
+                my $LIB_count_at_N_key = $LIB_count{$key};
+                my $INT_count_at_N_key = defined $INT_count{$key} ? $INT_count{$key} : "0.0000001";    ## JSD can't have counts=0
+                $R->run("LIB_count = c( LIB_count, $LIB_count_at_N_key )");
+                $R->run("INT_count = c( INT_count, $INT_count_at_N_key )");
             }
-            $R->run('counts=data.frame(ref_count,model_count)');
-            ## Calculate the proportion of each Isize in respective populations(ref & model)
+            $R->run('counts=data.frame(LIB_count,INT_count)');
+            ## Calculate the proportion of each i_size in LIB & INT
             $R->run('ct=prop.table(as.matrix(counts), margin=2)');
 
             ## Calculate the Jensen-Shannon Distance & parse output
@@ -978,29 +1080,23 @@ sub optimize_refs {
             $jsd_titration{$N} = $calc_JSD;
             printf VAR ( "%-20.5f", $calc_JSD );
 
-            # Calculate the JSdist CI for the model & parse output
+            # Calculate the JSD confidence interval for the model & parse output
             my $jsd_ci_lower;
             my $jsd_ci_upper;
-            ## Bootstrap the model population while keeping the reference population_freq intact
-            $R->run(
-                'calc_JSD_boot_fxn = function (x_df, index) {
-                            tmp_df <- data.frame( x_df[,1], x_df[index,2] )
-                            return ( calc_JSD(tmp_df) ) 
-                            }'
-            );
-            $R->run("JSD_boot <- boot(ct, calc_JSD_boot_fxn, R=1000, parallel=\"multicore\", ncpus=$options{threads})");
+            ## Bootstrap the INT population while keeping the LIB population_freq intact
+            $R->run("JSD_boot <- boot(ct, calc_JSD_boot_fxn, R=1000, stype = \"i\", parallel=\"multicore\", ncpus=$threads)");
             my $JSdist_ci = $R->run('boot.ci(JSD_boot, type="norm")');
             my $ci_data_line = ( split /\n/, $JSdist_ci )[8];
             if ( defined $ci_data_line ) {
                 $ci_data_line =~ /\s+\((.+)\,\s+(.+)\)/;
                 $jsd_ci_lower = $1;
                 $jsd_ci_upper = $2;
-                printf VAR ( "%-20.4f%-20.4f", $jsd_ci_lower, $jsd_ci_upper );    ##
+                printf VAR ( "%-20.4f%-20.4f", $jsd_ci_lower, $jsd_ci_upper );
             }
             else {
                 $jsd_ci_lower = "NULL";
                 $jsd_ci_upper = "NULL";
-                printf VAR ( "%-20s%-20s", $jsd_ci_lower, $jsd_ci_upper );        ##
+                printf VAR ( "%-20s%-20s", $jsd_ci_lower, $jsd_ci_upper );
             }
 
             ## Close R instance
@@ -1010,129 +1106,54 @@ sub optimize_refs {
     }
     close VAR;
 
-    my $calculated_n = &find_key_with_min_hash_value( \%variance_titration );
-    my $jsd_calc_n = ( $jsd == 1 ) ? &find_key_with_min_hash_value( \%jsd_titration ) : undef;
+    # Determine the optimal distance between the two sides of the INT
+    my $opti_AD_N = &find_key_with_min_hash_value( \%AD_titration );                              ## Optimal AD distance
+    my $opti_JSD_N = ( $jsd == 1 ) ? &find_key_with_min_hash_value( \%jsd_titration ) : undef;    ## Optimal JSD distance
 
+    # Print the optimal distance
+    open( OPT, ">", "$opts->{output_dir}/Opti_dist.txt" )
+        || confess "Error: Unable to open file to record optimal distance between references: $opts->{output_dir}/Opti_dist.txt\n";
+    print OPT "Opti_Distance: $opti_AD_N";
+    if ( $jsd == 1 ) { print OPT "\tJSD_Distance: $opti_JSD_N | JSD_value: $jsd_titration{$opti_JSD_N}"; }
+    print OPT "\n";
+    close OPT;
+
+    # Graph the AD & JSD titration data
+    my $R = Statistics::R->new( r_bin => '/usr/local/bin/R' );
+    $R->run("Table=read.table(\"$opts->{output_dir}\/Variance_from_avg.txt\", header=T, row.names=1)");
+    $R->run('df=data.frame(x=seq(0,length(Table[,2])-1), diff=Table[,1], jsd=Table[,2], lwr=Table[,3], upr=Table[,4])');
     if ( $jsd == 1 ) {
-        my $R = Statistics::R->new( r_bin => '/usr/local/bin/R' );
-        $R->run("Table=read.table(\"$opts->{output_dir}\/Variance_from_avg.txt\", header=T, row.names=1)");
-        $R->run('df=data.frame(x=seq(0,length(Table[,2])-1), diff=Table[,1], jsd=Table[,2], lwr=Table[,3], upr=Table[,4])');
-        ## Creat the JSD plot
+        ## Create the JSD plot
         $R->run("pdf(file=\"$opts->{output_dir}\/JSD_plot.pdf\")");
         $R->run('plot( jsd~x, data=df, ylim=range(c(df$lwr,df$upr)), cex=.1)');
         $R->run('with( df, polygon(c(x,rev(x)), c(lwr,rev(upr)), col="grey75", border=FALSE))');
         $R->run('matlines( df[,1], df[,c(-1,-2)], lwd=c(4,2,2), lty=1, col=c("black","red","red"))');
-        $R->run("abline( h=$jsd_titration{$jsd_calc_n}, col=\"magenta\")");
-        $R->run("abline( v=$jsd_calc_n, col=\"magenta\")");
+        $R->run("abline( h=$jsd_titration{$opti_JSD_N}, col=\"magenta\")");
+        $R->run("abline( v=$opti_JSD_N, col=\"magenta\")");
         $R->run('dev.off()');
-        ## Creat the Diff plot
-        $R->run("pdf(file=\"$opts->{output_dir}\/Diff_plot.pdf\")");
-        $R->run('plot(diff~x, data=df, ylim=range(df$diff), cex=.3, pch=19, cex.axis=0.6, cex.lab=0.6, font=2)');
-        $R->run("abline( h=$variance_titration{$calculated_n}, col=\"magenta\")");
-        $R->run("abline( v=$calculated_n, col=\"magenta\")");
-        $R->run('dev.off()');
-        ## Close R instance
-        $R->stop();
     }
+    ## Create the AD plot
+    $R->run("pdf(file=\"$opts->{output_dir}\/AD_plot.pdf\")");
+    $R->run('plot(diff~x, data=df, ylim=range(df$diff), cex=.3, pch=19, cex.axis=0.6, cex.lab=0.6, font=2)');
+    $R->run("abline( h=$AD_titration{$opti_AD_N}, col=\"magenta\")");
+    $R->run("abline( v=$opti_AD_N, col=\"magenta\")");
+    $R->run('dev.off()');
 
-    open( OPT, ">", "$opts->{output_dir}/Opti_dist.txt" )
-        || confess "Error: Unable to open file to record optimal distance between references: $opts->{output_dir}/Opti_dist.txt\n";
-    print OPT "Opti_Distance: $calculated_n";
-    if ( $jsd == 1 ) { print OPT "\tJSD_Distance: $jsd_calc_n | JSD_value: $jsd_titration{$jsd_calc_n}"; }
-    print OPT "\n";
-    close OPT;
-
-    my @n_num_list;
-    my @calc_ref1_region_list;
-    my @calc_ref2_region_list;
-
-    my @stdev_titration = ( 2, 1, .5, 0, -.5, -1 );
+    # Close R instance
+    $R->stop();
 
     if ( $opts->{titrate_n_string} == 1 ) {
+        my @stdev_titration = ( 2, 1, .5, -.5, -1 );
         foreach my $deviation (@stdev_titration) {
             my $step
                 = ( $jsd == 1 )
-                ? ( $jsd_calc_n + ( $opts->{stdev} * $deviation ) )
-                : ( $calculated_n + ( $opts->{stdev} * $deviation ) );
+                ? ( $opti_JSD_N + ( $LIB_stdev * $deviation ) )
+                : ( $opti_AD_N + ( $LIB_stdev * $deviation ) );
             if ( $step >= 0 ) { push( @n_num_list, $step ); }
         }
-        push( @calc_ref1_region_list, "$bam1_chr\:$bam1_min\-$bam1_max_adj" );
-        push( @calc_ref2_region_list, "$bam2_chr\:$bam2_min\-$bam2_max_adj" );
-    }
-    elsif ( $opts->{titrate_refs} == 1 ) {
-        if ( $opts->{anchor_bam1} == 1 ) {
-            foreach my $deviation (@stdev_titration) {
-                my $var = $opts->{insert_size} + ( $deviation * $opts->{stdev} );
-                push( @calc_ref2_region_list, ( $bam2_chr . ":" . ( $bam2_min - $var ) . "-" . ($bam2_max_adj) ) );
-            }
-            push( @calc_ref1_region_list, "$bam1_chr\:$bam1_min\-$bam1_max_adj" );
-        }
-        else {
-            foreach my $deviation (@stdev_titration) {
-                my $var = $opts->{insert_size} + ( $deviation * $opts->{stdev} );
-                push( @calc_ref1_region_list, ( $bam1_chr . ":" . ($bam1_min) . "-" . ( $bam1_max_adj + $var ) ) );
-            }
-            push( @calc_ref2_region_list, "$bam2_chr\:$bam2_min\-$bam2_max_adj" );
-        }
-        push( @n_num_list, "0" );
     }
 
-    # Finally, pull the region from the fasta reference
-    ## List to actual regions to return
-    my @ref1_data_list;
-    ## Allow --options{draw_ref#_region} to overide calculated regions.
-    my @iter_ref1_region_list = ( defined @{ $bam1_data->{draw_regions} } ) ? @{ $bam1_data->{draw_regions} } : @calc_ref1_region_list;
-    foreach my $region1 (@iter_ref1_region_list) {
-        $region1 =~ /^([\w\-\|\.]+)\:(\d+)\-(\d+)$/;
-        my ( $ref_chr, $ref_lower_range, $ref_upper_range ) = ( $1, $2, $3 );
-        my $ref_db = Bio::DB::Fasta->new( $opts->{ref1} );
-        my $seq
-            = ( $bam1_data->{rvcmplt} == 1 )
-            ? $ref_db->seq( $ref_chr, $ref_upper_range => $ref_lower_range )
-            : $ref_db->seq( $ref_chr, $ref_lower_range => $ref_upper_range );
-        my $region = ( $bam1_data->{rvcmplt} == 1 ) ? "$ref_chr\:$ref_upper_range\-$ref_lower_range" : "$ref_chr\:$ref_lower_range\-$ref_upper_range";
-        if ( $bam1_data->{rvcmplt} == 1 ) {
-            open( OUT, ">", "$opts->{output_dir}/REVERSE_COMPLEMENTED_$region1.txt" )
-                or confess "Error: Unable to open output: $opts->{output_dir}/REVERSE_COMPLEMENTED.txt\n";
-            print OUT "REVERSE_COMPLEMENTED: $region1\n";
-            close OUT;
-        }
-        push(
-            @ref1_data_list,
-            {   'seq'   => $seq,
-                'range' => $region,
-            }
-        );
-    }
-
-    ## List to actual regions to return
-    my @ref2_data_list;
-    ## Allow --options{draw_ref#_region} to overide calculated regions.
-    my @iter_ref2_region_list = ( defined @{ $bam2_data->{draw_regions} } ) ? @{ $bam2_data->{draw_regions} } : @calc_ref2_region_list;
-    foreach my $region2 (@iter_ref2_region_list) {
-        $region2 =~ /^([\w\-\|\.]+)\:(\d+)\-(\d+)$/;
-        my ( $ref_chr, $ref_lower_range, $ref_upper_range ) = ( $1, $2, $3 );
-        my $ref_db = Bio::DB::Fasta->new( $opts->{ref2} );
-        my $seq
-            = ( $bam2_data->{rvcmplt} == 1 )
-            ? $ref_db->seq( $ref_chr, $ref_upper_range => $ref_lower_range )
-            : $ref_db->seq( $ref_chr, $ref_lower_range => $ref_upper_range );
-        my $region = ( $bam2_data->{rvcmplt} == 1 ) ? "$ref_chr\:$ref_upper_range\-$ref_lower_range" : "$ref_chr\:$ref_lower_range\-$ref_upper_range";
-        if ( $bam2_data->{rvcmplt} == 1 ) {
-            open( OUT, ">", "$opts->{output_dir}/REVERSE_COMPLEMENTED_$region2.txt" )
-                or confess "Error: Unable to open output: $opts->{output_dir}/REVERSE_COMPLEMENTED.txt\n";
-            print OUT "REVERSE_COMPLEMENTED: $region2\n";
-            close OUT;
-        }
-        push(
-            @ref2_data_list,
-            {   'seq'   => $seq,
-                'range' => $region,
-            }
-        );
-    }
-
-    return ( \@ref1_data_list, \@ref2_data_list, @n_num_list );
+    return ( \@ret_ref1_data_list, \@ret_ref2_data_list, @n_num_list );
 }
 
 =head1
@@ -1162,7 +1183,7 @@ Args    :
         MM_ony      => <0|1>
         log         =>  "/path/to/log/file.txt"
 
-Returns : Array of hashes{'ref_data'->{file || seq || cords},'bam'->{file || dir || prefix}}
+Returns : Array of hashes{'ref_data'}->{file || seq || cords},'bam'->{file || dir || prefix}}
 
 =cut
 
@@ -1185,10 +1206,9 @@ sub merge_refs_and_map {
                 $out_suffix =~ s/:/_/g;
                 $out_suffix =~ s/\|/_/g;
                 my $out_dir = "$opts->{output_dir}\/$out_suffix";
-                run_cmd( "mkdir -p $out_dir", $opts->{log} );
-
+                mk_dir("$out_dir");
                 my $working_dir = "$out_dir\/merged_refs/";
-                run_cmd( "mkdir -p $working_dir", $opts->{log} );
+                mk_dir("$working_dir");
 
                 ## Build the new reference Sequence
                 my $new_ref = $ref1_region->{seq} . $n_string . $ref2_region->{seq};
@@ -1467,7 +1487,7 @@ sub bam2regions_of_coverage_v2 {
     my @header_lines = split( /\n/, $header );
     my $hd_line      = $header_lines[0];
     if ( $hd_line !~ /SO\:coordinate/ ) {
-        my ( $fn, $path, $suf ) = fileparse( $opts->{bam}, ( ".nsrt.bam", ".srt.bam", qr/\.[^\.]+/ ) );    ## FOOBAR
+        my ( $fn, $path, $suf ) = fileparse( $opts->{bam}, ( ".nsrt.bam", ".srt.bam", qr/\.[^\.]+/ ) );
         run_cmd("samtools sort $opts->{bam} $map_dir/$fn\.psrt");
         run_cmd("samtools index $map_dir/$fn\.psrt.bam");
         $opts->{bam} = "$map_dir/$fn\.psrt.bam";
@@ -1480,16 +1500,14 @@ sub bam2regions_of_coverage_v2 {
         chomp;
         my ( $chr, $current_position, $cov ) = ( split /\t/, $_ )[ 0, 1, 3 ];
         if ( !$window->{chr} ) {
-
-            # Initialize new window
+            ## Initialize new window
             $window->{chr}           = $chr;
             $window->{$chr}->{start} = $current_position;
             $window->{$chr}->{end}   = $current_position;
             $window->{coverage} += $cov;
         }
         elsif ( $window->{chr} ne $chr ) {
-
-            # Add region to the list of regions to return
+            ## Add region to the list of regions to return
             @ret_region_list = &_bam2regions_of_coverage_add_region( $window, @ret_region_list );
 
             # Delete old window
@@ -1501,13 +1519,12 @@ sub bam2regions_of_coverage_v2 {
             $window->{$chr}->{end}   = $current_position;
             $window->{coverage} += $cov;
         }
-        elsif ( $current_position - $window->{$chr}->{end} <= $max_window_size ) {
+        elsif ( $current_position < $window->{$chr}->{end} + $max_window_size ) {
             $window->{$chr}->{end} = $current_position;
             $window->{coverage} += $cov;
         }
-        elsif ( $current_position - $window->{$chr}->{end} > $max_window_size ) {
-
-            # Add region to the list of regions to return
+        elsif ( $current_position >= $window->{$chr}->{end} + $max_window_size ) {
+            ## Add region to the list of regions to return
             @ret_region_list = &_bam2regions_of_coverage_add_region( $window, @ret_region_list );
 
             # Delete old window
@@ -1530,12 +1547,11 @@ sub bam2regions_of_coverage_v2 {
 
 sub _bam2regions_of_coverage_add_region {
     my ( $window, @ret_region_list ) = @_;
-    my $min_cov = defined( $options{min_cov} ) ? $options{min_cov} : "1";
 
     my $chr          = $window->{chr};
     my $total_bp     = $window->{$chr}->{end} - $window->{$chr}->{start};
     my $avg_coverage = ceil( $window->{coverage} / $total_bp );
-    if ( $avg_coverage >= $min_cov ) {
+    if ( $avg_coverage >= $min_coverage ) {
         push( @ret_region_list, "$chr\:$window->{$chr}->{start}\-$window->{$chr}->{end}" );
     }
     return @ret_region_list;
@@ -1543,94 +1559,62 @@ sub _bam2regions_of_coverage_add_region {
 
 sub help {
     die
-        "Help: This script will take a 2 bams mapped @ different references and merge the references & map at the merged reference. The final new bam can be drawn as a png or svg. This is useful for merging and illustrating LGT regions.
+        "Help: This script will take a 2 bams mapped @ different references and merge the references & map at the merged reference. The final new bam can be drawn as a png or svg. This is useful for merging and illustrating INT regions.
     --------------------------------------------------------------------------------------------------------------------------------------------------------
-    --bam1=                 bam1. Assumes position sorted & indexed. If not, use --sort=1. (Mandatory)
-      --bam1_region=        <chr#:100-200> Pull reads only from this region. (Highly recommended)
-      --split_bam1_cov=     <0|1> [0] 1= Try to pull reads from regions of the bam with coverage.
+    --bam1=                 bam1. Assumes coordinate sorted & indexed. If not, use --sort=1. (Mandatory)
+      --bam1_region=        <chr#:100-200> Pull reads only from this region. (Recommended; without it all regions >= --min_cov will be inspected.)
       --sort1=              <0|1> [0] 1= Position sort & index bam1.
     --bam2=                 bam2. Assumes position sorted & indexed. If not, use --sort=1. (Optional)
-      --bam2_region=        <chr#:100-200> Pull reads only from this region. (Highly recommended)
-      --split_bam2_cov=     <0|1> [0] 1= Try to pull reads from regions of the bam with coverage.
+      --bam2_region=        <chr#:100-200> Pull reads only from this region. (Recommended; without it all regions >= --min_cov will be inspected.)
       --sort2=              <0|1> [0] 1= Position sort & index bam2.
     --picard_file|P=        < /path/to/file.txt > Picard insert metrics file.
-      --insert_size|I=      < # > (Mandatory if no --picard_file). 
-      --stdev|D=            < # > (Mandatory if no --picard_file). 
+      --insert_size|I=      < # > overides data in the LIB picard file.
+      --stdev|D=            < # > overides data in the LIB picard file.
+    --min_cov=              < # > [2] Min average coverage over a region to inspect. 
+    --reads_list=           Path to a file with a list of desired reads to parse for. 1 read ID / line. 
     --------------------------------------------------------------------------------------------------------------------------------------------------------
     --ref1=                 Reference 1 fasta.      (Assumes bam1 is already mapped aginst ref1)[ /local/projects-t3/HLGT/references/hg19/hg19.fa ]
       --ref1_region=        <chr#:100-200> Use this reference range to map & draw reads against. ** More info below **
     --ref2=                 Reference 2 fasta.      (If no --bam2, and --ref2 is used, --bam1 will be mapped against --ref2)
       --ref2_region=        <chr#:100-200> Use this reference range to map & draw reads against.  ** More info below **
     --------------------------------------------------------------------------------------------------------------------------------------------------------
-    --titrate_refs=         <0|1> [0] 1= Calculate the ideal distance of sequence between reads. ** More Info on --titrate_refs below **
-      --anchor_bam1=        <0|1> [0] 1= Keep upstream region the same while titrating downstream bam region. 0 = anchor Right. 
-      --titrate_n_string=   <0|1> [0] 1= Draw {--titrate_refs} distance between refs and the +/-[2, 1.5, 1.0, 0.5]Deviations*{--titrate_refs}
-      --jsd=                <0|1> [0] 1= Calculate Jensen-Shannon Divergence between the model and reference insert size distributions.
-    --fix_orientation=      <0|1> [1] 1= Try to determine how the references should be organized L-vs-R to make Mates face eachother.
-                                      0= Bam1 is on Left, Bam2 is on Right.
-    --------------------------------------------------------------------------------------------------------------------------------------------------------
-    --reads_list=           Path to a file with a list of desired reads to parse for. 1 read ID / line. 
-    --M_only=               <0|1> [0] 1= When remapping to the merged reference, only keep M_* read pairs
-    --MM_only=              <0|1> [1] 1= When remapping to the merged reference, only keep M_M read pairs (Highly recommended)
+    --jsd=                <0|1> [1] 1= Calculate Jensen-Shannon Distance between the LIB and INT i_size distributions.
+    --titrate_n_string=   <0|1> [1] 1= Draw optimal N distance between refs. +/- {2, 1.5, 1.0, 0.5} * \$LIB_STDEV
+    --fix_orientation=    <0|1> [1] 1= Try to determine how the references should be organized L-vs-R to make Mates face eachother.
+                                    0= Bam1 is on Left, Bam2 is on Right.
+    --MM_only=              <0|1> [1] 1= When remapping to the merged reference, only keep M_M read pairs (Highly recommended=1)
     --merged_ref_name=      Name for the new reference.         [Merged]
-    --n_num|n=              Number of \"N's\" to insert inbetween merged references. [0] May also take comma delimited list or multiple entries. Useless with --titrate_refs=1.
-    --draw_nstring=         <0|1> [0] 1= Draw the n-string \"contig\". Useless with --titrate_refs=1.
     --------------------------------------------------------------------------------------------------------------------------------------------------------
+    --n_num|n=              Number of \"N's\" to insert inbetween merged references. [0] May also take comma delimited list or multiple entries.
+    --draw_nstring=         <0|1> [1] 1= Draw the n-string \"contig\".
+    --svg=                  <0|1> [1] 1= Create a svg img of the merged bam.
     --png=                  <0|1> [0] 1= Create a png img of the merged bam.
-    --svg=                  <0|1> [0] 1= Create a svg img of the merged bam.
       --image_length=       Ajust the length of the png created.
       --image_width=        Adjust the width of the png created. 
       --pad_scale=          Pad white space around img. 
     --------------------------------------------------------------------------------------------------------------------------------------------------------
-    --draw_both|B=          <0|1> [0] 1= Draw both a \"normal\" & stdev color coded img.
+    --draw_both|B=          <0|1> [1] 1= Draw both a \"normal\" & stdev color coded img.
     --draw_stdev|d=         <0|1> [0] 1= Color code the reads based on # of STDEV from the median insert size;
                                 +/- STDEV * 0.5=Light Red/Green ; 1=Red/Green ; 2=Dark Red/Green
     --------------------------------------------------------------------------------------------------------------------------------------------------------                              
     --output_dir|o=         Directory for output.               [/options/bam1/dir/]
     --output_prefix|p=      Prefix for the output fasta & bam.  [bam1-merged-bam2]
-    --threads|t=
+    --threads|t=            < # > [3] # threads to use. 
     --stdout=               <0|1> [0] 1= Output goes to STDOUT. Either pipe it into a \"display\" ( | display - ) or redirect it to a new file ( > new.img)
-    --help|?
-    --------------------------------------------------------------------------------------------------------------------------------------------------------
-     ** More info  ** 
-    --ref#_region = May also accept a file with 1 region / line. May also take comma delimited regions or multiple --ref_region entries. If no region given, defaults to bam region. 
-    Either --optimize option will calculate the ideal distance between references and draw +2, +1, +.5,0,-.5, -1 stdev's of read insert size around calculated ideal. 
-    When using either --optimize option, you must pass --stdev & --insert_size.
-     --------------------------------------------------------------------------------------------------------------------------------------------------------
-    Example: perl merge_2lgt_bams.pl --bam1=bam_with_lgt_reads.bam --sort1=1 --ref1=hg19.fa --ref2=bacteria_with_lgt.fa --ref1_region=chr1:100-500 --bam1_region=chr1:200-400 --MM_only=1 --svg=1
-    This will pull reads from the {bam_with_lgt_reads.bam} @ {chr1:200-400} ; map them against {bacteria_with_lgt.fa} ; create a new reference from {chr1:100-500} & 
-    the region where the reads mapped in the {bacteria_with_lgt.fa}. The reads that are {mapped-mapped} to the new reference are then kept in the final bam and drawn as an {svg}. 
+    --help|?                Show --options
+    --more_info             Show description how the script works and more info on the --options.
     --------------------------------------------------------------------------------------------------------------------------------------------------------\n";
 }
 
+sub more_info {
+    die "\n\tThis script will take a bam and 2 references. Primarily this script will be used to calculate a model for the distance between the sides of an INT. 
+    \t--bam1= Assumes this is position sorted. If no --bam2, this MUST be a NAME sorted bam to map at --ref2.
+    \t\tIdeally, this bam has been filtered for high confidence reads supporting 1 INT.
+    \t\tThe user can pass samtools style (chrZ:1-100) --bam_regions to pull reads from the region of the bam and try to create an INT model.
+    \t\tThe user can specify a --ref_region to dictate both sides of the INT. These --ref_regions may not have coverage. --ref_region overides --bam_region.
+    \t\tIf neither --bam_regions or --ref_region was used, --split_bam_cov will try break apart the --bam1 & --bam2 by coverage >1 and look for regions supporting an INT.
+    \t
+    \n"
+}
+
 ###################################
-
-__END__
-            # $R->run('JSdist=vegdist( ct, method = "jensen-shannon", useShrinkage = TRUE )');
-            # my $JSdist = $R->run('summary(JSdist)');
-            # my $JSdist_split = ( split /\n/, $JSdist )[1];
-            # my ( $JSmedian, $JSmean ) = ( split /\s+/, $JSdist_split )[ 2, 3 ];
-            # printf VAR ( "\t%20s\t%20s", $JSmedian, $JSmean );
-            # $jsd_titration{$N} = $JSmedian;
-
-                        # Calculate the mean insert size CI for the model & parse output
-            # $R->run('library(boot)');
-            # $R->run('calc_mean_fxn=function(x,indices){ return( mean( x[indices] ) ) }');
-            # $R->set( 'model_raw', \@Isize );
-            # $R->run("model_boot_sampling = boot( model_raw, calc_mean_fxn, R=100, parallel=\"multicore\", ncpus=$options{threads})");
-            # my $model_ci_data = $R->run('boot.ci(model_boot_sampling, type="norm")');
-            # my @model_ci_data_split = split( /\n/, $model_ci_data );
-            # my $ci_lower;
-            # my $ci_upper;
-
-            # if ( !$model_ci_data_split[8] ) {
-            #     if ( $model_ci_data_split[1] eq 'NULL' ) {
-            #         $ci_lower = "NULL";
-            #         $ci_upper = "NULL";
-            #     }
-            # }
-            # if ( $model_ci_data_split[8] =~ /\s+\((.+)\,\s+(.+)\)/ ) {
-            #     $ci_lower = $1;
-            #     $ci_upper = $2;
-            # }
-            # printf VAR ("\t%20s","$ci_lower -> $ci_upper");
