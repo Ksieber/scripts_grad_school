@@ -157,7 +157,7 @@ if ( !$options{bam2} && $options{ref2} ) {
 my $sort1 = defined $options{sort1} ? $options{sort1} : "0";
 my $sort2 = defined $options{sort2} ? $options{sort2} : "0";
 
-# Cordinate sort we the option was passed
+# Cordinate sort if the option was passed
 if ( $sort1 == 1 ) {
     print STDERR "======== Position sort bam1 ========\n";
     run_cmd( "samtools sort -o $options{input} - | samtools view -b - > $map_dir/$fn1\_psort.bam", $map_log );
@@ -209,7 +209,7 @@ if ( $options{split_bam2_cov} == 1 ) {
 }
 
 my %reads;    ## Hash of desired read id's.
-if ( $options{reads_list} ) {
+if ( defined $options{reads_list} and -e $options{reads_list} ) {
     open( IN, "<", "$options{reads_list}" ) or confess "Can't open reads_list: $options{reads_list} because: $!\n";
     while (<IN>) {
         chomp;
@@ -294,7 +294,6 @@ foreach my $bam1_region (@bam1_region_list) {
         ##
         my $ref1_data_list;
         my $ref2_data_list;
-        ## Maybe set before hand?  = (defined $options{n_num} && @{$options{n_num}}>1 ) ? push(@n_num_list,split( /,/, join( ',', @{ $options{ref1_region} } ) ) : "0";
         my @n_num_list;
         if ( $optimize == 1 ) {
             print STDERR "======== Pull LGT-Ref Seq && Calculate Optimal LGT-Ref Spacing ========\n";
@@ -428,9 +427,11 @@ Args    :
         draw_regions    => \@draw_ref#_region,
         log             => '/path/to/log.txt'
 Returns : Returns a data structure with an array of the data as well as the data stored by hash.
+        'file'          => /file/path/input.bam
         'hash'          => \%bam_data_hash,
         'header'        => \@samtools_header
         'strand'        => Integer. Positive means more reads map to + strand.
+        'bam_region'    => 'chr:100-200'
         'draw_regions'  => \@draw_ref#_region,
 =cut
 
@@ -490,6 +491,13 @@ Args    :
         
         
 Returns : 
+    {
+        file        => $ret_bam,
+        ids         => $merged_ids,         # %Hash
+        count       => $count,
+        bam1_strand => $bam1_orientation,
+        bam2_strand => $bam2_orientation,
+    };
 
 =cut
 
@@ -498,9 +506,6 @@ sub merge_bams {
     my $bam1_data = $opts->{bam1_data};
     my $bam2_data = $opts->{bam2_data};
     run_cmd( "mkdir -p $opts->{output_dir}", $log );
-
-    # print STDERR "bam1: " . Dumper($bam1_data) . "\n";
-    # print STDERR "bam2: " . Dumper($bam2_data) . "\n";
 
     # Grab ID's present & mapping in both
     my $merged_ids = &merge_hash_ids( [ $bam1_data->{id_hash}, $bam2_data->{id_hash} ] );
@@ -872,8 +877,8 @@ sub optimize_refs {
     my $r1_length = Math::NumberCruncher::Mean( \@r1_length_list );
     my $r2_length = Math::NumberCruncher::Mean( \@r2_length_list );
 
-    my $bam1_max_adj = $bam1_max + ( $r1_length - 1 );
-    my $bam2_max_adj = $bam2_max + ( $r2_length - 1 );
+    my $bam1_max_adj = $bam1_max + ( $r1_length - 1 );      ## Subtract 1 b/c zero based counting
+    my $bam2_max_adj = $bam2_max + ( $r2_length - 1 );      ## Subtract 1 b/c zero based counting
 
     my @Isize;
     foreach my $id ( keys %{ $opts->{merged_bam}->{ids} } ) {
@@ -1548,6 +1553,9 @@ sub help {
       --bam2_region=        <chr#:100-200> Pull reads only from this region. (Highly recommended)
       --split_bam2_cov=     <0|1> [0] 1= Try to pull reads from regions of the bam with coverage.
       --sort2=              <0|1> [0] 1= Position sort & index bam2.
+    --picard_file|P=        < /path/to/file.txt > Picard insert metrics file.
+      --insert_size|I=      < # > (Mandatory if no --picard_file). 
+      --stdev|D=            < # > (Mandatory if no --picard_file). 
     --------------------------------------------------------------------------------------------------------------------------------------------------------
     --ref1=                 Reference 1 fasta.      (Assumes bam1 is already mapped aginst ref1)[ /local/projects-t3/HLGT/references/hg19/hg19.fa ]
       --ref1_region=        <chr#:100-200> Use this reference range to map & draw reads against. ** More info below **
@@ -1556,7 +1564,7 @@ sub help {
     --------------------------------------------------------------------------------------------------------------------------------------------------------
     --titrate_refs=         <0|1> [0] 1= Calculate the ideal distance of sequence between reads. ** More Info on --titrate_refs below **
       --anchor_bam1=        <0|1> [0] 1= Keep upstream region the same while titrating downstream bam region. 0 = anchor Right. 
-      --titrate_n_string=   <0|1> [0] 1= Calculate ideal distance of unknown sequence between reads.
+      --titrate_n_string=   <0|1> [0] 1= Draw {--titrate_refs} distance between refs and the +/-[2, 1.5, 1.0, 0.5]Deviations*{--titrate_refs}
       --jsd=                <0|1> [0] 1= Calculate Jensen-Shannon Divergence between the model and reference insert size distributions.
     --fix_orientation=      <0|1> [1] 1= Try to determine how the references should be organized L-vs-R to make Mates face eachother.
                                       0= Bam1 is on Left, Bam2 is on Right.
@@ -1565,8 +1573,8 @@ sub help {
     --M_only=               <0|1> [0] 1= When remapping to the merged reference, only keep M_* read pairs
     --MM_only=              <0|1> [1] 1= When remapping to the merged reference, only keep M_M read pairs (Highly recommended)
     --merged_ref_name=      Name for the new reference.         [Merged]
-    --n_num|n=              Number of \"N's\" to insert inbetween merged references. [0] May also take comma delimited list or multiple entries. 
-    --draw_nstring=         <0|1> [0] 1= Draw the n-string \"contig\".
+    --n_num|n=              Number of \"N's\" to insert inbetween merged references. [0] May also take comma delimited list or multiple entries. Useless with --titrate_refs=1.
+    --draw_nstring=         <0|1> [0] 1= Draw the n-string \"contig\". Useless with --titrate_refs=1.
     --------------------------------------------------------------------------------------------------------------------------------------------------------
     --png=                  <0|1> [0] 1= Create a png img of the merged bam.
     --svg=                  <0|1> [0] 1= Create a svg img of the merged bam.
@@ -1577,12 +1585,10 @@ sub help {
     --draw_both|B=          <0|1> [0] 1= Draw both a \"normal\" & stdev color coded img.
     --draw_stdev|d=         <0|1> [0] 1= Color code the reads based on # of STDEV from the median insert size;
                                 +/- STDEV * 0.5=Light Red/Green ; 1=Red/Green ; 2=Dark Red/Green
-    --insert_size|I=        < # > 
-    --stdev|D=              < # >
-    --picard_file|P=        < /path/to/file.txt > Picard insert metrics file. Must be used if --stdev && --insert_size are not used or if jsd is calculated.
     --------------------------------------------------------------------------------------------------------------------------------------------------------                              
     --output_dir|o=         Directory for output.               [/options/bam1/dir/]
     --output_prefix|p=      Prefix for the output fasta & bam.  [bam1-merged-bam2]
+    --threads|t=
     --stdout=               <0|1> [0] 1= Output goes to STDOUT. Either pipe it into a \"display\" ( | display - ) or redirect it to a new file ( > new.img)
     --help|?
     --------------------------------------------------------------------------------------------------------------------------------------------------------
