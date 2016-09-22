@@ -1,4 +1,5 @@
 package lca2krona;
+use lib ( '/home/ksieber/scripts/', '/home/ksieber/perl5/lib/perl5/' );
 use strict;
 use warnings;
 use mk_dir;

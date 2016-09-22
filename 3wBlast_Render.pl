@@ -8,7 +8,7 @@ use Bio::SearchIO::Writer::TextResultWriter;
 
 
 my $file = shift or die "Usage: 3wBlast_Render.pl <blast.filei> <ReadID>\n";
-my $id = shift or die; 
+my $id = shift or die "Usage: 3wBlast_Render.pl <blast.filei> <ReadID>\n";
 
 my $indexed_file = "$file.idx";
 my $indexed = -e $indexed_file;

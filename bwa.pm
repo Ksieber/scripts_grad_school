@@ -1,4 +1,5 @@
 package bwa;
+use lib ( '/home/ksieber/scripts/', '/home/ksieber/perl5/lib/perl5/' );
 use warnings;
 use strict;
 use run_cmd;
@@ -47,10 +48,10 @@ sub bwa_mem {
     my $sort_mem   = defined $options->{sort_mem}   ? $options->{sort_mem}   : "1G";
     my $other      = defined $options->{other}      ? "$options->{other} "   : "";
     my $Picard_jar = defined $options->{Picard_jar} ? $options->{Picard_jar} : "/home/ksieber/lib/picard/dist/picard.jar";
-    my $bwa        = defined $options->{bwa}        ? $options->{bwa}        : "/home/ksieber/lib/bwa/bwa";
+    my $bwa        = defined $options->{bwa}        ? $options->{bwa}        : "bwa";
     my $interleaved = ( defined $options->{interleaved} and $options->{interleaved} == 1 ) ? "-p " : "";
-    my $fastq1;    ## Global input file name
-    my $fastq2;    ## Global input file name2
+    my $fastq1;
+    my $fastq2;
 
     ## Setup output prefix (path/file-name).bam
     my ( $ref_name, $ref_path, $ref_suf ) = fileparse( $ref,   @ref_suffix_list );    ## Grab the reference name to use for the naming the output
@@ -64,7 +65,9 @@ sub bwa_mem {
 
     if ( $in_suf eq ".bam" ) {
         if ( !-e $input ) { confess "Error: input bam(?) does not exist: $input"; }
-        run_cmd("java -Xmx4G -jar $Picard_jar SamToFastq VALIDATION_STRINGENCY=SILENT I=$input  F=$output_dir_pref\_1.fastq F2=$output_dir_pref\_2.fastq");
+        run_cmd(
+            "java -Xmx5G -XX:-UseGCOverheadLimit -XX:-UseParallelGC -jar $Picard_jar SamToFastq VALIDATION_STRINGENCY=SILENT I=$input  F=$output_dir_pref\_1.fastq F2=$output_dir_pref\_2.fastq TMP_DIR=/local/projects-t3/HLGT/TCGA/ksieber_dir/tmp/ MAX_RECORDS_IN_RAM=1000000"
+        );
         $fastq1 = "$output_dir_pref\_1.fastq";
         $fastq2 = "$output_dir_pref\_2.fastq";
     }
@@ -75,7 +78,7 @@ sub bwa_mem {
             my ( $fq_fn, $fq_path, $fq_suf ) = fileparse( $fastq1, ( "_1.fastq", "_1.fq" ) );
             if    ( -e "$fq_path/$fq_fn\_2.fastq" ) { $fastq2 = "$fq_path/$fq_fn\_2.fastq"; }
             elsif ( -e "$fq_path/$fq_fn\_2.fq" )    { $fastq2 = "$fq_path/$fq_fn\_2.fq"; }
-            else                                    { $fastq2 = ""; }
+            else                                    { die "Could not determine fastq2.\n"; }
         }
 
     }
@@ -89,7 +92,9 @@ sub bwa_mem {
     run_cmd( "$bwa mem $interleaved$other-t $threads $ref $fastq1 $fastq2 | samtools view -S - -bo $output_dir_pref\.bam", $log );
 
     ## Sort and index bams
-    if ( ( defined $options->{sort_index} and $options->{sort_index} == 1 ) or ( defined $options->{insert_metrics} and $options->{insert_metrics} == 1 ) ) {
+    if (   ( defined $options->{sort_index} and $options->{sort_index} == 1 )
+        or ( defined $options->{insert_metrics} and $options->{insert_metrics} == 1 ) )
+    {
         run_cmd( "samtools sort -@ $threads -m $sort_mem $output_dir_pref\.bam $output_dir_pref\.srt 2>>$output_dir_pref\_bwa_stderr.log", $log );
         run_cmd( "samtools index $output_dir_pref\.srt.bam 2>>$output_dir_pref\_bwa_stderr.log",                                           $log );
     }
@@ -117,7 +122,9 @@ sub bwa_mem {
             run_cmd( "rm $fastq1", $log );
             run_cmd( "rm $fastq2", $log );
         }
-        if ( ( defined $options->{sort_index} and $options->{sort_index} == 1 ) or ( defined $options->{insert_metrics} and $options->{insert_metrics} == 1 ) ) {
+        if (   ( defined $options->{sort_index} and $options->{sort_index} == 1 )
+            or ( defined $options->{insert_metrics} and $options->{insert_metrics} == 1 ) )
+        {
             run_cmd( "rm $output_dir_pref\.bam", $log );
         }
         if ( -e "$output_dir_pref\_bwa_stderr.log" ) { run_cmd( "rm $output_dir_pref\_bwa_stderr.log", $log ); }
@@ -170,7 +177,7 @@ sub bwa_aln {
     my $bam;                                                                        ## 0=fastq, 1=bam
     if ( $files =~ /.fq$/ || $files =~ /.fastq$/ || $files =~ /.fastq.gz$/ ) {
         ( $file1, $file2 ) = split( /,/, $files );
-        if ( $file2 !~ /\w+/ ) { $file2 = $file1; }
+        if ( !defined $file2 ) { die "Error: No _2.fastq was detected. Please try agian.\n"; }
         $bam = 0;
     }
     elsif ( $files =~ /.bam$/ ) {
@@ -195,7 +202,9 @@ sub bwa_aln {
     if ( $dir =~ /\/\/$/ ) { $dir =~ s/\/$//g; }
     my $output_prefix = "$dir\/$out";
 
-    if ( $files =~ /\.bam$/ and ( ( defined $options->{name_sort_input} and $options->{name_sort_input} == 1 ) or `samtools view -H $file1 | head -n 1` !~ /queryname/ ) ) {
+    if ( $files =~ /\.bam$/
+        and ( ( defined $options->{name_sort_input} and $options->{name_sort_input} == 1 ) or `samtools view -H $file1 | head -n 1` !~ /queryname/ ) )
+    {
         $options->{name_sort_input} = 1;
         run_cmd( "samtools sort -n -@ $threads -m $sort_mem $file1 $output_prefix\_name-sorted", $log );
         $file1 = "$output_prefix\_name-sorted.bam";
@@ -213,17 +222,28 @@ sub bwa_aln {
     }
 
     if ( defined $options->{M_only} and $options->{M_only} ) {
-        run_cmd( "$bwa sampe $ref $output_prefix\.1.sai $output_prefix\.2.sai $file1 $file2 | samtools view -bhS -F0x4 - > $output_prefix\.bam 2>>$output_prefix\_bwa_stderr.log", $log );
+        run_cmd(
+            "$bwa sampe $ref $output_prefix\.1.sai $output_prefix\.2.sai $file1 $file2 | samtools view -bhS -F0x4 - > $output_prefix\.bam 2>>$output_prefix\_bwa_stderr.log",
+            $log
+        );
     }
     elsif ( defined $options->{MM_only} and $options->{MM_only} ) {
-        run_cmd( "$bwa sampe $ref $output_prefix\.1.sai $output_prefix\.2.sai $file1 $file2 | samtools view -bhS -F0xC - > $output_prefix\.bam 2>>$output_prefix\_bwa_stderr.log", $log );
+        run_cmd(
+            "$bwa sampe $ref $output_prefix\.1.sai $output_prefix\.2.sai $file1 $file2 | samtools view -bhS -F0xC - > $output_prefix\.bam 2>>$output_prefix\_bwa_stderr.log",
+            $log
+        );
     }
     elsif ( defined $options->{sam_output} and $options->{sam_output} == 1 ) {
         if ( defined $options->{disable_SW} and $options->{disable_SW} == 1 ) {
-            run_cmd( "$bwa sampe -s $ref $output_prefix\.1.sai $output_prefix\.2.sai $file1 $file2 > $output_prefix\.sam 2>>$output_prefix\_bwa_stderr.log", $log );
+            run_cmd(
+                "$bwa sampe -s $ref $output_prefix\.1.sai $output_prefix\.2.sai $file1 $file2 > $output_prefix\.sam 2>>$output_prefix\_bwa_stderr.log",
+                $log
+            );
         }
         else {
-            run_cmd( "$bwa sampe $ref $output_prefix\.1.sai $output_prefix\.2.sai $file1 $file2 > $output_prefix\.sam 2>>$output_prefix\_bwa_stderr.log", $log );
+            run_cmd(
+                "$bwa sampe $ref $output_prefix\.1.sai $output_prefix\.2.sai $file1 $file2 > $output_prefix\.sam 2>>$output_prefix\_bwa_stderr.log",
+                $log );
         }
     }
     else {

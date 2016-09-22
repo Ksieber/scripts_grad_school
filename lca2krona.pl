@@ -13,7 +13,7 @@ my %options;
 my $results = GetOptions( \%options, 'input|i=s', 'input_list=s', 'output_dir|o=s', 'output_prefix|p=s', 'col=i', 'Qsub|q=i', 'sub_name=s', 'project=s', 'help|?' )
     or die "Error: Unrecognized command line option. Please try again.\n";
 
-if ( $options{help} )   { &help; }
+if ( $options{help} ) { &help; }
 if ( !$options{input} ) { die "Error: You must pass an input file with --input=<LCA.txt>\n"; }
 
 if ( defined $options{Qsub} and $options{Qsub} == 1 ) {

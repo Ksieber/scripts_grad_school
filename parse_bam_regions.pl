@@ -1,4 +1,6 @@
-#!/usr/local/bin/perl -w
+#!/usr/local/bin/perl
+use lib ( '/home/ksieber/scripts/', '/home/ksieber/perl5/lib/perl5/' );
+use warnings;
 use linecount;
 use errorcheck;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);

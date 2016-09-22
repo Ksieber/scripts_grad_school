@@ -1,4 +1,5 @@
 #!/usr/bin/perl
+use lib ( '/home/ksieber/scripts/' );
 use strict;
 use linecount;
 
@@ -13,11 +14,10 @@ elsif ( -e $ARGV[0] ) {
     my $linecount = wc( $ARGV[0] );
     print "$linecount\n";
 }
-elsif ( scalar(@ARGV) == 0 ) {
+elsif ( !@ARGV and !-t STDIN ) {
     my $counter;
     while (<STDIN>) {
         $counter++;
     }
     print "$counter\n";
 }
-

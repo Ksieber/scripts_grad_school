@@ -1,4 +1,5 @@
-#!/usr/bin/perl -I /home/ksieber/scripts/ -I /home/ksieber/perl5/lib/perl5/
+#!/usr/bin/perl
+use lib ( '/home/ksieber/scripts/', '/home/ksieber/perl5/lib/perl5/' );
 use warnings;
 no warnings 'uninitialized';
 use strict;
@@ -42,8 +43,9 @@ foreach my $input (@$inputs) {
     my $output_dir = $options{output_dir} ? $options{output_dir} : $dir;
     $output_dir =~ s/\/$//;
     my $output_prefix = $options{output_prefix} ? $options{output_prefix} : $fn;
+    my $bwa_index_prefix = ( ( defined $options{output_prefix} ) or ( defined $options{output_dir} ) ) ? "-p $output_dir/$output_prefix$suf " : undef;
 
-    my $cmd = "bwa index -p $output_dir/$output_prefix$suf $input";
+    my $cmd = "bwa index $bwa_index_prefix$input";
     run_cmd($cmd);
 
     if ( $options{faidx} == 1 ) {

@@ -1,4 +1,8 @@
 #!/usr/local/bin/perl
+use lib (
+    '/home/ksieber/scripts/',                       '/home/ksieber/perl5/lib/perl5/',
+    '/local/projects-t3/HLGT/scripts/lgtseek/lib/', '/local/projects/ergatis/package-driley/lib/perl5/x86_64-linux-thread-multi/'
+);
 use warnings;
 no warnings 'uninitialized';
 use strict;
@@ -6,7 +10,7 @@ use run_cmd;
 use Carp;
 $Carp::MaxArgLen = 0;
 use File::Basename;
-use lib qw(/local/projects-t3/HLGT/scripts/lgtseek/lib/);
+use mk_dir;
 use LGTSeek;
 use Data::Dumper;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
@@ -22,14 +26,30 @@ if ( !$options{input} )      { die "ERROR: Must give an input file with: --input
 if ( !-e "$options{input}" ) { die "ERROR: Input file can't be found."; }
 if ( !$options{window_size} || !$options{step_size} ) { die "ERROR: Must pass the --window_size & --step_size. Use --Help for more info.\n"; }
 
+my ( $in_fn, $in_path, $in_suf ) = fileparse( $options{input}, qr/\.[^\.]+/ );
+my $out_dir  = defined $options{output_dir}    ? $options{output_dir}    : $in_path;
+my $out_pref = defined $options{output_prefix} ? $options{output_prefix} : $in_fn;
+$out_dir =~ s/([\/]{2,})/\//g;
+mk_dir($out_dir);
+my $out = "$out_dir\/$out_pref\.sliding-win-cov";
+my $OUT_FH;
+if ( ( defined $options{output_dir} ) or ( defined $options{output_prefix} ) ) {
+    open( $OUT_FH, ">", "$out" ) or die "Error: Unable to open the output: $out because: $!\n";
+}
+else {
+    $OUT_FH = *STDOUT;
+}
+
+my $qsub = defined $options{Qsub} ? "$options{Qsub}" : "0";
+if ( $qsub == 1 ) { Qsub_script( \%options ); }
+
 my $lgtseq = LGTSeek->new2( \%options );
 our $window_size = defined $options{window_size} ? $options{window_size}   : "10";
 our $step_size   = defined $options{step_size}   ? $options{step_size} - 1 : "5";
-our $min_cov     = defined $options{min_cov}     ? "$options{min_cov}"     : "1";
+our $min_cov     = defined $options{min_cov}     ? "$options{min_cov}"     : "0";
 our $tdo         = defined $options{tdo}         ? "$options{tdo}"         : "0";
 
 my $sort = defined $options{sort} ? "$options{sort}" : "0";
-my $qsub = defined $options{Qsub} ? "$options{Qsub}" : "0";
 
 my $region  = defined $options{region}      ? "'$options{region}'"       : undef;
 my $d       = defined $options{d}           ? $options{d}                : 100000;
@@ -38,7 +58,7 @@ my $view    = "$quality -hu";                              ## Default
 my $A       = defined $options{A} ? "$options{A}" : "1";
 my $mpileup = ( $A == 0 ) ? "-d $d" : "-Ad $d";            ## Default
 
-my $window;                                                # keys: coverage (total coverage seen in window), start (actual start), stop (expected stop), bases (total in window seen), chr
+my $window;    # keys: coverage (total coverage seen in window), start (actual start), stop (expected stop), bases (total in window seen), chr
 my $next_window;
 my $fh = open_input( $options{input} );
 
@@ -79,15 +99,18 @@ while (<$fh>) {
 
 print_coverage($window);
 close $fh;
+close $OUT_FH;
 
 sub open_input {
     my $raw_input = shift;
     my ( $fn, $path, $suffix ) = fileparse( $raw_input, ( @{ $lgtseq->{mpileup_suffix_list} }, @{ $lgtseq->{bam_suffix_list} } ) );
 
     if ( $lgtseq->empty_chk( { input => $raw_input } ) == 1 ) { confess "ERROR: Input file:$raw_input is empty."; }
-    ## Filehandle to return.
+
+    # Filehandle to return.
     my $fh;
-    ## Mpileup input
+
+    # Mpileup input
     map {
         if ( $suffix eq $_ ) {
             ## Warn we can't filter quality with mpileup input.
@@ -101,34 +124,35 @@ sub open_input {
         }
     } @{ $lgtseq->{mpileup_suffix_list} };
 
-    ## Position sorted bam
-    my @psort_bams = ( '_pos-sort.bam', '_psort.bam', '.psort.bam', 'srt.bam' );
+    # Position sorted bam
+    my @psort_bams = ( '_pos-sort.bam', '_psort.bam', '.psort.bam', 'srt.bam', 'pos-sort.bam' );
     map {
-        if ( $suffix eq $_ ) {
+        if ( $suffix eq $_ or ( $suffix eq ".bam" and $sort == 0 ) ) {
             open( $fh, "-|", "samtools view $view $raw_input $region | samtools mpileup $mpileup - " )
                 || confess "ERROR: Can't open input: $raw_input because: $!\n";
             return $fh;
         }
     } @psort_bams;
 
-    ## Name sorted bam || --sort=1
+    # Name sorted bam or --sort=1
     map {
-        if ( $suffix eq $_ || $sort == 1 ) {
+        if ( $suffix eq $_ or $sort == 1 ) {
             print STDERR "Sorting input bam . . .\n";
             open( $fh, "-|", "samtools sort -m 1G -o $raw_input - | samtools view $view - $region | samtools mpileup $mpileup - " )
-                || confess "ERROR: Can't open input: $raw_input because: $!\n";
+                or confess "ERROR: Can't open input: $raw_input because: $!\n";
             return $fh;
         }
     } @{ $lgtseq->{bam_suffix_list} };
+    die "Error: Unable to determine the type of input.\n";
 }
 
 sub print_coverage {
     my $window          = shift;
-    my $window_coverage = sprintf( "%.2f", $window->{'coverage'} / $window->{'bases'} );
+    my $window_coverage = ( $window->{'coverage'} == 0 ) ? "0.0" : sprintf( "%.2f", $window->{'coverage'} / $window->{'bases'} );
     my $actual_stop     = ( $window->{'start'} + $window->{'bases'} );
     my $step_pos        = $window->{'start'} + $step_size;
-    my $to_print        = $tdo == 1 ? "$window_coverage\t$window->{chr}\t$step_pos\n" : "$window_coverage\t$window->{chr}\:$window->{start}\-$actual_stop\n";
-    print $to_print if ( $window_coverage >= $min_cov );
+    my $to_print = $tdo == 1 ? "$window_coverage\t$window->{chr}\t$step_pos\n" : "$window_coverage\t$window->{chr}\:$window->{start}\-$actual_stop\n";
+    print $OUT_FH $to_print if ( $window_coverage >= $min_cov );
 }
 
 sub init_window {
@@ -145,7 +169,8 @@ sub init_window {
 
 sub help {
     die "Help: This script will calculate coverage with a sliding window. 
-    --input|i=             Mpileup or bam.
+        --input|i=         Mpileup or bam.
+        --region=          Chr:Start-Stop
         --sort|S=          <0|1> [0] 1= Position sort input bam.
         --window_size|w=   Size of the window to calculate coverage for. 
         --step_size|s=     Size of the steps inbetween windows.
@@ -155,6 +180,6 @@ sub help {
         --output_dir|o=    Directory for output.
         --tdo=             <0|1> [0] 1= Tab Delimited Output of chr and position. 0= IGV style.
         --Qsub|q=          <0|1> [0] 1= Qsub job to grid.
-    --help|?\n";
+        --help|?\n";
 }
 

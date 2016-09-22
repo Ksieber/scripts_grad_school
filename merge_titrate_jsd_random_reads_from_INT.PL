@@ -1,4 +1,5 @@
-#!/usr/bin/perl -I /home/ksieber/perl5/lib/perl5/ -I /home/ksieber/scripts/
+#!/usr/bin/perl
+use lib ( '/home/ksieber/scripts/', '/home/ksieber/perl5/lib/perl5/' );
 use warnings;
 use strict;
 use run_cmd;
@@ -12,7 +13,7 @@ use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
 my $results = GetOptions( \%options, 'input|i=s', 'output_dir|o=s', 'graph|g=i', 'test_linear_relationship|T=i', 'ylim=s', 'help|?' ) or die "Unrecognized command line option. Please try agian.\n";
 
-if ( $options{help} )   { &help; }
+if ( $options{help} ) { &help; }
 if ( !$options{input} ) { die "Error: Must give an input directory merge JSD_titration_summary.txt from. Please try again.\n"; }
 my $files = run_cmd("find $options{input} -name \'*JSD_titration_summary.txt\'");
 my @files_to_merge = split( /\n/, $files );

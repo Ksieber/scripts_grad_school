@@ -91,7 +91,7 @@ sub get_ref_id {
         if (/^\@SQ\s+SN:gi\|\d+\|\w+\|(\S+)\|/) {    # Matches "NC_014448" from example: "@SQ  SN:gi|304372805|ref|NC_014448.1|  LN:839615"
             $id = $1;
         }
-        elsif (/^\@SQ\s+SN:(\w{2}\_\d+)/) {          # Matches "NC_014448" from example: "@SQ  SN:NC_014448  LN:839615"
+        elsif (/^\@SQ\s+SN:(\w{2}\_\d+\.?\d?)/) {          # Matches "NC_014448" from example: "@SQ  SN:NC_014448  LN:839615"
             $id = $1;
         }
     } @lines;

@@ -1,4 +1,5 @@
-#!/usr/bin/perl -I /home/ksieber/perl5/lib/perl5/ -I /home/ksieber/scripts/
+#!/usr/bin/perl
+use lib ( '/home/ksieber/scripts/', '/home/ksieber/perl5/lib/perl5/' );
 my $VERSION = "2.01";
 use warnings;
 use strict;
@@ -123,7 +124,7 @@ sub calc_jsd {
     }
     else {
         foreach my $insert ( sort { $a <=> $b } keys %$pop2 ) {
-            my $pop_1_isize_count = defined $pop1->{$insert} ? $pop1->{$insert} : "0.000000000001"; 
+            my $pop_1_isize_count = defined $pop1->{$insert} ? $pop1->{$insert} : "0.000000000001";
             my $pop_2_isize_count = defined $pop2->{$insert} ? $pop2->{$insert} : "0.000000000001";
             ## Add the pop and model count of each insert size to the matrix by col.
             $R->run("pop_1_count   = c( pop_1_count,   $pop_1_isize_count   )");

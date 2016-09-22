@@ -5,13 +5,14 @@ use File::Basename;
 use Bio::SeqIO;
 
 if ( -t STDIN && !@ARGV ) { &help; }
+if ( defined $ARGV[0] and $ARGV[0] =~ /\-\?|\-h|\-\-help/ ) { &help; }
 
 ## Global Variables
 my %counts;
 &clear_counts;
 my $previous_id;
 
-## Determine how to process the input
+## Determine how to process an input file
 if ( defined $ARGV[0] ) {
     if ( -e $ARGV[0] ) {
         my ( $fn, $dir, $suf ) = fileparse( $ARGV[0], ( '.fa', '.fasta', '.fq', '.fastq', '.bam' ) );
@@ -21,6 +22,7 @@ if ( defined $ARGV[0] ) {
     }
     elsif ( $ARGV[0] =~ /[AaTtGgCc]+/ ) { &count( $ARGV[0] ); &print_counts; }
 }
+## Determine how to process the input from STDIN
 else {
     chomp( my $line = <STDIN> );
     my @split_line = split( /\t/, $line );
@@ -31,7 +33,10 @@ else {
     else                             { die "Could not determine what type of file this is. Please try again.\n"; }
 }
 
-## Subroutines
+#################
+## Subroutines ##
+#################
+
 sub process_bam {
     my $opts = shift;
     if ( defined $opts->{file} ) {
@@ -64,11 +69,11 @@ sub _process_bam_line {
 sub count {
     my $sequence = shift;
     $counts{A}           += $sequence =~ tr/Aa//;
-    $counts{T}           += $sequence =~ tr/Tt//;
+    $counts{T}           += $sequence =~ tr/TtUu//;
     $counts{G}           += $sequence =~ tr/Gg//;
     $counts{C}           += $sequence =~ tr/Cc//;
     $counts{N}           += $sequence =~ tr/Nn//;
-    $counts{total}       += $sequence =~ tr/AaTtGgCcNn//;
+    $counts{total}       += $sequence =~ tr/AaTtGgCcUuNn//;
     $counts{tot_A}       += $counts{A};
     $counts{tot_T}       += $counts{T};
     $counts{tot_G}       += $counts{G};
@@ -114,7 +119,7 @@ sub print_grand_total {
     printf "%2.1f\t", ( $counts{tot_G} / $counts{grand_total} ) * 100;
     print "\%C ";
     printf "%2.1f\t", ( $counts{tot_C} / $counts{grand_total} ) * 100;
-    if ( $counts{tot_N} >= 1 ) { print "\%N:"; printf "%2.1f", ( $counts{tot_N} / $counts{grand_total} ) * 100; }
+    if ( $counts{tot_N} >= 1 ) { print "\%N:"; printf "%2.1f\t", ( $counts{tot_N} / $counts{grand_total} ) * 100; }
     print "\%GC: ";
     printf "%2.1f\t", ( ( $counts{tot_G} + $counts{tot_C} ) / $counts{grand_total} ) * 100;
     print "%AG: ";
@@ -157,7 +162,7 @@ sub process_seq_fh {
     my $seq_fh    = shift;
     my $seqs_seen = 0;
     while ( my $seq = $seq_fh->next_seq() ) {
-        print $seq->display_id() . ": ";
+        print $seq->display_id() . "\t";
         count( $seq->seq() );
         &print_counts;
         &clear_counts;
@@ -169,7 +174,7 @@ sub process_seq_fh {
 sub help {
     die "
     _____________________________________________________________________________________________
-    This script will calculate the percentage of each residue, GC, and AG of a sequence.
-    It can read sequence, fasta files, and bam files from STDIN or \$ARGV[0].
-    _____________________________________________________________________________________________\n";
+    This script will calculate the percentage of each residue, GC, and AG of a sequence. U's are treated at T's.
+    It can read sequence, fasta/fastq files, and bam files from STDIN or \$ARGV[0].
+    _____________________________________________________________________________________________\n\n";
 }

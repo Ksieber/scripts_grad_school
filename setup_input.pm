@@ -1,4 +1,5 @@
 package setup_input;
+use lib ( '/home/ksieber/scripts/', '/home/ksieber/perl5/lib/perl5/' );
 use strict;
 use warnings;
 use Exporter;

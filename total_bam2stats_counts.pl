@@ -16,8 +16,8 @@ my $input = defined $options{input} ? $options{input} : $ARGV[0];
 open( IN, "<", "$input" ) or die "Error: Unable to open input: $options{input}\n";
 while (<IN>) {
     chomp;
-    next if($_=~/^BAM/);
-    next if($_=~/^Total-Bams/);
+    next if ( $_ =~ /^BAM/ );
+    next if ( $_ =~ /^Total-Bams/ );
     my ( $bam, $total, $MM, $MU, $UU, $SC ) = split;
     $counts{bam}++;
     $counts{'total'} = $counts{'total'} + $total;
@@ -35,6 +35,6 @@ print $OUT "\n";
 
 sub help {
     die "This script will calculate the total numbers of a bam2stats.txt file. Output => STDOUT.
-	--input|i= 	bam2stats.txt file.
-	--help|?\n";
+    --input|i=  bam2stats.txt file.
+    --help|?\n";
 }

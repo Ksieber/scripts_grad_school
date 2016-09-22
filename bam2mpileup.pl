@@ -7,11 +7,12 @@ use setup_input;
 use File::Basename;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
-my $results
-    = GetOptions( \%options, 'input|i=s', 'input_list|I=s', 'sort=s', 'threads|t=i', 'output_prefix|p=s', 'output_dir|o=s', 'Qsub|q=s', 'region=s', 'A=s', 'd=s', 'M_M=s', 'M_UM=s', 'help|?', 'ref|r=s', )
-    or die "Error: Unrecognized command line option. Please try again.\n";
+my $results = GetOptions(
+    \%options,  'input|i=s', 'input_list|I=s', 'sort=i', 'threads|t=i', 'sort_mem=s', 'sub_mem=s', 'output_prefix|p=s', 'output_dir|o=s', 'Qsub|q=s',
+    'region=s', 'A=s',       'd=s',            'MM=s',   'MU=s',        'help|?',     'ref|r=s',
+) or die "Error: Unrecognized command line option. Please try again.\n";
 
-if ( $options{help} ) {
+if ( $options{help} or not @ARGV ) {
     die "HELP: This script will take a bam file and calculate the coverage.
         --input=            Input bam (Position sorted)
         --input_list=       List of bams to process.
@@ -22,8 +23,8 @@ if ( $options{help} ) {
         --output_dir=       Name the directory for output.  
          --output_prefix=   [filename] Prefix for the output file.
         --region=           chr1:100-200. Use to look @ reads only in this region. Highly recommended to use.
-        --M_M=              <0|1> [0] 1= calculate Mapped_Mapped reads only. 
-        --M_UM=             <0|1> [0] 1= calculate Mapped_UN-Mapped reads only. Works for LGT reads.
+        --MM=               <0|1> [0] 1= calculate Mapped_Mapped reads only. 
+        --MU=               <0|1> [0] 1= calculate Mapped_Unmapped reads only. Works for LGT reads.
         --d=                [10000] Max Coverage per base. 
         --A=                <0|1> [1] 1= Count anomalous read pairs (LGT).
         --Qsub=             <0|1> [0] 1= Qsub the mpileup foreach input.\n";
@@ -43,9 +44,12 @@ my $d        = defined $options{d}        ? $options{d}          : 100000;
 my $region   = defined $options{region}   ? "'$options{region}'" : undef;
 my $threads  = defined $options{threads}  ? "$options{threads}"  : 4;
 my $sort_mem = defined $options{sort_mem} ? "$options{sort_mem}" : "1G";
-my $ref      = defined $options{ref}      ? "$options{ref}"      : undef;
-my $view    = "-hu";       ## Default
-my $mpileup = "-Ad $d";    ## Default
+$sort_mem =~ /(^\d+)\w{1}/;
+my $sort_mem_number = $1;
+my $sub_mem         = defined $options{sub_mem} ? $options{sub_mem} : ( $1 * $threads + 2 ) . "G";
+my $ref             = defined $options{ref} ? "$options{ref}" : undef;
+my $view            = "-hu";                                                                         ## Default
+my $mpileup         = "-Ad $d";                                                                      ## Default
 
 if ( $MM == 1 ) {
     $view    = "-huF0xC";
@@ -69,6 +73,6 @@ foreach my $bam (@$input) {
     elsif ( defined $options{region} || $options{MM} == 1 || $options{MU} == 1 ) { $cmd = "samtools view $view $bam $region | samtools mpileup $mpileup - > $out\.mpileup"; }
     else                                                                         { $cmd = "samtools mpileup $mpileup $bam > $out\.mpileup"; }
 
-    if ( $qsub == 1 ) { Qsub( { cmd => $cmd, threads => $threads, sub_mem => $sort_mem, wd => $dir, sub_name => "mpileup" } ); next; }
+    if ( $qsub == 1 ) { Qsub( { cmd => $cmd, threads => $threads, sub_mem => $sub_mem, wd => $dir, sub_name => "mpileup" } ); next; }
     else              { run_cmd($cmd); }
 }

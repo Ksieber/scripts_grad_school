@@ -19,7 +19,7 @@ sub print_call {
     foreach my $key ( sort keys %$options ) {
         if ( $options->{$key} ) { print STDERR " --$key=$options->{$key}" }
     }
-    if ( defined @_ and scalar(@_) >= 1 ) {
+    if ( @_ and scalar(@_) >= 1 ) {
         foreach my $comment (@_) {
             print STDERR "\n$comment";
         }
@@ -34,7 +34,7 @@ sub print_complete {
     foreach my $key ( sort keys %$options ) {
         if ( $options->{$key} ) { print STDERR " --$key=$options->{$key}" }
     }
-    if ( defined @_ and scalar(@_) >= 1 ) {
+    if ( @_ and scalar(@_) >= 1 ) {
         foreach my $comment (@_) {
             print STDERR "\n$comment";
         }
@@ -65,7 +65,7 @@ sub print_notebook {
     foreach my $key ( sort keys %$options ) {
         if ( $options->{$key} ) { print OUT " --$key=$options->{$key}" }
     }
-    if ( defined @_ and scalar(@_) >= 1 ) {
+    if ( @_ and scalar(@_) >= 1 ) {
         foreach my $comment (@_) {
             print OUT "\n$comment";
         }
@@ -76,10 +76,10 @@ sub print_notebook {
 
 =head2 print_progress
     Title       : print_progress
-    Usage       : while(<>){print_progress; do other stuff ... }
-    Function    : Print "." to STDERR every $cutoff through a loop to show progress is being made.
-    Args        : print_progress($cutoff) -> every $cutoff "." is printed.
-                    $cutoff default = 100000
+    Usage       : while(<>){print_progress; do important stuff ... }
+    Function    : Print "." to STDERR every $x_#_of_iterations through a loop to show progress is being made.
+    Args        : print_progress( $number )
+                    default = 100000. ie every 100000th iteration through a loop, "." is printed.
 =cut
 
 my $counter;

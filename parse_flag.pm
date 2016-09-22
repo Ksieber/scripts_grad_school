@@ -1,4 +1,5 @@
 package parse_flag;
+use lib ( '/home/ksieber/scripts/', '/home/ksieber/perl5/lib/perl5/' );
 use warnings;
 use strict;
 use Exporter;

@@ -1,4 +1,4 @@
-#!/usr/bin/perl -I /home/ksieber/perl5/lib/perl5/ -I /home/ksieber/scripts/
+#!/usr/bin/perl
 
 =head1 NAME
 
@@ -22,7 +22,10 @@ The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with a _
 
 =cut
-
+use lib (
+    '/home/ksieber/perl5/lib/perl5/',               '/home/ksieber/scripts/',
+    '/local/projects-t3/HLGT/scripts/lgtseek/lib/', '/local/projects/ergatis/package-driley/lib/perl5/x86_64-linux-thread-multi/'
+);
 use warnings;
 use strict;
 use Scalar::Util qw(reftype);
@@ -37,11 +40,11 @@ use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 our %options;
 my $results = GetOptions(
     \%options,   'input_list|I=s', 'input|i=s',      'name_sort_input=i', 'sort_mem=i', 'Qsub|q=i',    'excl=i', 'sub_mem=i', 'sub_mail=s', 'sub_wd=s',
-    'threads=i', 'projects=s',     'output_dir|o=s', 'subdirs=i',         'verbose=i',  'overwrite=i', 'help|?',
+    'threads|t=i', 'projects=s',     'output_dir|o=s', 'subdirs=i',         'verbose=i',  'overwrite=i', 'help|?',
 );
 
 if ( $options{help} ) {
-    die "Help Basic Info: This script will remove M_M reads and split output bams into smaller bams. 
+    die "Help Basic Info: Run PrinSeq low complexity & Picard duplicate removal.
         --input|i=              <BAM>
         --input_list|I=         <List of bams> 1 Bam / line.
         --name_sort_input=      <0|1> [0] 1= Resort the input bam by read names.  

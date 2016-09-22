@@ -1,4 +1,6 @@
-#!/usr/local/bin/perl -w
+#!/usr/local/bin/perl
+use lib ( '/home/ksieber/scripts/', '/home/ksieber/perl5/lib/perl5/' );
+use warnings;
 use strict;
 use run_cmd;
 use mk_dir;

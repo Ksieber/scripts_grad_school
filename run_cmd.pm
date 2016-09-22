@@ -1,4 +1,5 @@
 package run_cmd;
+use lib ( '/home/ksieber/scripts/', '/home/ksieber/perl5/lib/perl5/' );
 use warnings;
 no warnings 'uninitialized';
 use strict;
@@ -155,7 +156,7 @@ sub Qsub_script {
     }
 
     ## Setup input
-    if ( !$options->{input} && !$options->{input_list} && !$options->{bam} && !$options->{fasta} ) {
+    if ( !$options->{input} && !$options->{input_list} && !$options->{bam} && !$options->{fasta} and !$options->{fastq} and !$options->{fastq1} ) {
         confess "Error: No input given. Use --input or --input_list.\n";
     }
 
@@ -182,8 +183,18 @@ sub Qsub_script {
     elsif ( $options->{fasta} ) {
         push( @inputList, $options->{fasta} );
     }
+    elsif ( $options->{fastq} ) {
+        push( @inputList, $options->{fastq} );
+    }
+    elsif ( $options->{fastq1} ) {
+        push( @inputList, $options->{fastq1} );
+    }
 
     my $original_output_dir = defined $options->{output_dir} ? $options->{output_dir} : undef;
+    if ( !defined $options->{output_dir} and !defined $options->{output_prefix} and defined $options->{output} ) {
+        my ( $tmp_fn, $tmp_dir ) = fileparse( $options->{output} );
+        $original_output_dir = $tmp_dir;
+    }
 
     ## Build and submit commands
     foreach my $input (@inputList) {
@@ -206,8 +217,8 @@ sub Qsub_script {
             next if ( $key eq 'input_list' && !$options->{Qsub_iterate} );
             next if ( $key eq 'Qsub' );
             next if ( $key eq 'Qsub_iterate' );
-            next if ( $key eq 'subdirs'    && !$options->{Qsub_iterate} );
-            next if ( $key eq 'tcga_dirs'  && !$options->{Qsub_iterate} );
+            next if ( $key eq 'subdirs' && !$options->{Qsub_iterate} && !$options->{input_list} );
+            next if ( $key eq 'tcga_dirs' && !$options->{Qsub_iterate} );
             next if ( $key eq 'excl' );
             next if ( $key eq 'no_gal' );
             next if ( $key eq 'sub_mem' );
@@ -274,7 +285,7 @@ sub _Qsub_cmd {
         cmd         => command/shell script to be qsub'ed
         log         => file to log the qsub command in.
         threads     => # cpu threads to use.
-        sub_mem     => Memory free @ start. [5G]
+        sub_mem     => Memory free @ start. [1G]
         sub_name    => Job Name.
         project     => grid project to use.
         wd          => Directory for grid to work from.
@@ -292,7 +303,7 @@ sub _Qsub_opt {
     my $threads = undef;
     my $t       = defined $config->{threads} ? $config->{threads} : 1;
     if ( $t >= 2 ) { $threads = " -pe thread $t -q threaded.q"; }
-    my $mem      = defined $config->{sub_mem}  ? " -l mf=$config->{sub_mem}"            : " -l mf=5G";
+    my $mem      = defined $config->{sub_mem}  ? " -l mf=$config->{sub_mem}"            : " -l mf=1G";
     my $project  = defined $config->{project}  ? " -P $config->{project}"               : " -P jdhotopp-lab";
     my $cwd      = defined $config->{cwd}      ? " -cwd"                                : undef;
     my $sub_name = defined $config->{sub_name} ? " -N $config->{sub_name}"              : undef;
@@ -306,9 +317,9 @@ sub _Qsub_opt {
     ## SGE mail; if sub_mail=1 defaults to username\@som.umaryland.edu else it mails to specified sub_mail=Whatever@email.foo
     chomp( my $user_name = `whoami` );
     my $sub_mail;
-    if    ( $config->{sub_mail} =~ /\w+\@\w+\.\w{3}/ ) { $sub_mail = " -M $config->{sub_mail} -m aes"; }
-    elsif ( $config->{sub_mail} == 1 )                 { $sub_mail = " -M $user_name\@som.umaryland.edu -m aes"; }
-    else                                               { undef $sub_mail; }
+    if    ( defined $config->{sub_mail} and $config->{sub_mail} =~ /\w+\@\w+\.\w{3}/ ) { $sub_mail = " -M $config->{sub_mail} -m aes"; }
+    elsif ( defined $config->{sub_mail} and $config->{sub_mail} == 1 )                 { $sub_mail = " -M $user_name\@som.umaryland.edu -m aes"; }
+    else                                                                               { undef $sub_mail; }
 
     if ($log) {
         open( $fh, ">>", "$log" ) or confess "Can't open: $fh because: $!\n";

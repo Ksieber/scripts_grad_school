@@ -32,6 +32,9 @@ use run_cmd;
 use setup_input;
 use print_call;
 use File::Basename;
+
+if ( !@ARGV ) { &help; }
+
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
 my $results = GetOptions(
@@ -96,7 +99,7 @@ foreach my $input (@$inputs) {
     ## Setup output directory
     if ( !$lgtseek->{output_dir} ) { $lgtseek->{output_dir} = "$path/bam2lca/"; }
     $lgtseek->_run_cmd("mkdir -p $lgtseek->{output_dir}");
-    if ( $lgtseek->{subdirs} == 1 ) {
+    if ( defined $options{subdirs} and $options{subdirs} == 1 ) {
         $lgtseek->_run_cmd("mkdir -p $lgtseek->{output_dir}");
         $lgtseek->{output_dir} = "$options{output_dir}/" . "$name/";
         $lgtseek->_run_cmd("mkdir -p $lgtseek->{output_dir}");

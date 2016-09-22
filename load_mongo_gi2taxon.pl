@@ -13,6 +13,13 @@ Loads mongo gi2taxon on a remote host
 Use this script to start/load a gi2taxon database. It assumes you have started 
 a mongod server on the remote host
 
+*****************************************************************************
+*** IF MONGO IS NOT RUNNING ON REVAN RUN THIS COMMAND & SCRIPT FROM REVAN ***
+
+/export/mongodb-linux-x86_64-2.2.2/bin/mongod --quiet --dbpath=/local/projects-t3/HLGT/references/MongoDB_gi2Taxon/ --port=10001 --logpath=/local/projects-t3/HLGT/references/MongoDB_gi2Taxon/MongoDB.log &
+
+*****************************************************************************
+
 =head1 AUTHOR - Karsten Sieber
 
 e-mail: ksieber@som.umaryland.edu

@@ -1,4 +1,5 @@
-#!/usr/bin/perl -I /home/ksieber/perl5/lib/perl5/ -I /home/ksieber/scripts/
+#!/usr/bin/perl
+use lib ( '/home/ksieber/scripts/', '/home/ksieber/perl5/lib/perl5/' );
 use strict;
 use warnings;
 use mk_dir;
@@ -17,30 +18,51 @@ if ( !$options{chr} )   { die "Error: Must pass a \"chr\" to pull from the input
 my $input = $options{input};
 my ( $fn, $path, $suf ) = fileparse( $input, qr/\.[^\.]+/ );
 
-my $output_dir = defined $options{output_dir} ? $options{output_dir} : $path;
+my $output_dir    = defined $options{output_dir}    ? $options{output_dir}    : $path;
 my $output_prefix = defined $options{output_prefix} ? $options{output_prefix} : $fn;
 my $output        = defined $options{output}        ? $options{output}        : "$output_dir/$output_prefix\.fa";
-my ($o_fn, $o_path, $o_suf) = fileparse($output, qr/\.[^\.]+/);
+my ( $o_fn, $o_path, $o_suf ) = fileparse( $output, qr/\.[^\.]+/ );
 mk_dir($o_path);
 
-open( my $OUT, ">", "$output" ) or die "Error: Unable to open the output.fa: $output\n";
+my $OUT;
+if ( defined $options{output_dir} or defined $options{output_prefix} or defined $options{output} ) {
+    if ( -e $output ) { die "Error: Unsure what to name the output, $output already exists.\n"; }
+    open( $OUT, ">$output" ) or die "Error: Unable to open the output.fa: $output\n";
+}
+else {
+    $OUT = *STDOUT;
+}
 
 my $fasta_db = Bio::DB::Fasta->new($input);
 my ( $lower_range, $upper_range ) = ( split /\-/, $options{range} ) if ( defined $options{range} );
-my $new_seq = ( defined $options{range} ) ? $fasta_db->seq( $options{chr}, $lower_range => $upper_range ) : $fasta_db->seq( $options{chr} );
-print $OUT ">$options{chr}";
-print $OUT ":$lower_range\-$upper_range" if ( $options{range} );
-print $OUT "\n";
-print $OUT "$new_seq";
+
+if ( defined $options{chr} and $options{chr} =~ /all/ ) {
+    if ( !defined $options{range} ) { die "Error: when --chr=\'all\' must use --range=\'#-#\'. Please try again. \n"; }
+    my $stream = $fasta_db->get_PrimarySeq_stream;
+    while ( my $seq = $stream->next_seq ) {
+        print $OUT "\>" . $seq->id() . "\n" . $seq->subseq( $lower_range, $upper_range ) . "\n";
+    }
+}
+else {
+    my $new_seq = ( defined $options{range} ) ? $fasta_db->seq( $options{chr}, $lower_range => $upper_range ) : $fasta_db->seq( $options{chr} );
+    print $OUT "\>$options{chr}";
+    print $OUT ":$lower_range\-$upper_range" if ( defined $options{range} );
+    print $OUT "\n";
+    print $OUT "$new_seq\n";
+}
+
 close $OUT;
 
 sub help {
-    die "\n  This script will pull a fasta entry and/or range from a fasta file and create a new fasta.
-	--input|i=			/some/input.fa to pull the sequence from.
-	--chr|c=			Desired Fasta entry \"chr\" from the input file.
-	--range=			<###-###> Optional positional range for the chr. 
-	--output|O=			Exact output desired. ex: /foo/bar/out.fa
-	--output_dir|o=			Directory for output.
-	--output_prefix|p=		Prefix for output.
+    die "\n	This script will pull a fasta entry and/or range from a fasta file and 
+	print it to a new fasta if any --output* is given else it prints to STDOUT.
+
+	--input|i=				/some/input.fa to pull the sequence from.
+	--chr|c=				Desired Fasta entry \"chr\" from the input file.
+	  ** If --chr='all' script will pull --range for all chr.
+	--range=				<###-###> Optional positional range for the chr. 
+	--output|O=				Exact output desired. ex: /foo/bar/out.fa
+	--output_dir|o=				Directory for output.
+	--output_prefix|p=			Prefix for output.
 	--help\n\n";
 }

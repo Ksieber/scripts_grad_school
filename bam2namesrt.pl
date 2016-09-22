@@ -27,10 +27,10 @@ if ( $options{help} ) {
 
 $options{input} = defined $options{input} ? $options{input} : $ARGV[0];
 if ( !$options{input} && !$options{input_list} ) { die "Error: Must pass an input file with --input, --input_list, or $ARGV[0]. Please try again.\n"; }
-$options{sub_mem}  = defined $options{sub_mem}  ? "$options{sub_mem}"  : "5G";
-$options{sub_name} = defined $options{sub_name} ? "$options{sub_name}" : "NameSortBam";
 
 if ( $options{Qsub} ) {
+    $options{sub_mem}  = defined $options{sub_mem}  ? "$options{sub_mem}"  : "5G";
+    $options{sub_name} = defined $options{sub_name} ? "$options{sub_name}" : "NameSortBam";
     my $original_sub_mem;
     my $original_sort_mem;
     if ( $options{sub_mem} ) {

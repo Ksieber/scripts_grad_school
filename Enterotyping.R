@@ -31,10 +31,11 @@ pam.clustering=function(x,k) {  # x is a distance matrix and k the number of clu
 	cluster = as.vector( pam( as.dist(x), k, diss=TRUE ) $clustering)
 	return( cluster) 
 }
-data_cluster = pam.clustering(data_dist, k=3 )
+# data_cluster = pam.clustering(data_dist, k=3 )
 
 require(clusterSim)
-nclusters = index.G1( t(data), data_cluster, d = data_dist, centrotypes = "medoids" )
+# nclusters = index.G1( t(data), data_cluster, d = data_dist, centrotypes = "medoids" )
+nclusters=NULL
 
 for (k in 1:20 ) {
 	if (k==1){
@@ -46,7 +47,9 @@ for (k in 1:20 ) {
 }
 
 plot(nclusters, type="h", xlab="k clusters", ylab="CH index")
-data_cluster = pam.clustering(data_dist, k=3 )
+# data_cluster = pam.clustering(data_dist, k=3 )
+opt_cluster_num <- which(nclusters==max(nclusters, na.rm=TRUE)) # KBS
+data_cluster = pam.clustering(data_dist, k=opt_cluster_num )
 
 library(cluster)
 obs_silhouette = mean( silhouette( data_cluster, data_dist )[,3] )

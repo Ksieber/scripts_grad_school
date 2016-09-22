@@ -26,7 +26,7 @@ Internal methods are usually preceded with a _
 use warnings;
 use strict;
 use Scalar::Util qw(reftype);
-use Qsub;
+use run_cmd;
 use LGTSeek;
 use File::Basename;
 use setup_input;

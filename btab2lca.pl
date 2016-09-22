@@ -92,20 +92,20 @@ print_complete( \%options );
 
 sub help {
     die "Help: This script will take a btab output file and create the LCA for each query.
-	--input|i=				btab blast.txt
-	--output_dir|o=			Directory for output.										[*STDOUT]
-	  --output_prefix=		Prefix_lca.txt	  											[Input filename]
-	--krona|k=				<0|1> 1= Draw Krona plot. 									[0]
-	--evalue_cutoff=		Max evalue.													[1]
-	--best_hits_only|B=		<0|1> 1= Parse the btab blast report for best hits only. 	[0] 
-	--Qsub|q=				<0|1> 1= qsub the job to the grid. 							[0]
-	  --project=			Grid project to use. 										[jdhotopp-lab]
-	--help|h
+    --input|i=              btab blast.txt
+    --output_dir|o=         Directory for output.                                       [*STDOUT]
+      --output_prefix=      Prefix_lca.txt                                              [Input filename]
+    --krona|k=              <0|1> 1= Draw Krona plot.                                   [0]
+    --evalue_cutoff=        Max evalue.                                                 [1]
+    --best_hits_only|B=     <0|1> 1= Parse the btab blast report for best hits only.    [0] 
+    --Qsub|q=               <0|1> 1= qsub the job to the grid.                          [0]
+      --project=            Grid project to use.                                        [jdhotopp-lab]
+    --help|h
 
-	Example: 	
-		perl /home/ksieber/scripts/btab2lca.pl --input=input_blast.txt --output_dir=/some/where/for/output/ --krona=1 --evalue_cutoff=1e-10
-		perl /home/ksieber/scripts/btab2lca.pl -i input_blast.txt -o /some/where/for/output/ -k 1 --best_hits_only=1
-				\n";
+    Example:    
+        perl /home/ksieber/scripts/btab2lca.pl --input=input_blast.txt --output_dir=/some/where/for/output/ --krona=1 --evalue_cutoff=1e-10
+        perl /home/ksieber/scripts/btab2lca.pl -i input_blast.txt -o /some/where/for/output/ -k 1 --best_hits_only=1
+                \n";
 }
 
 sub organism2lineage {

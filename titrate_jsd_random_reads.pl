@@ -1,5 +1,6 @@
-#!/usr/bin/perl -I /home/ksieber/perl5/lib/perl5/ -I /home/ksieber/scripts/
+#!/usr/bin/perl
 my $VERSION = "2.10";
+use lib ( '/home/ksieber/scripts/', '/home/ksieber/perl5/lib/perl5/' );
 use warnings;
 use strict;
 use Carp;
@@ -171,10 +172,10 @@ foreach my $number_of_reads (@reads_number_to_process) {
         $R->run('ref_count   = numeric()');
         $R->run('model_count = numeric()');
         foreach my $key ( sort { $a <=> $b } keys %reference ) {
-            my $pop_isize_count = $reference{$key};
+            my $LIB_isize_count = $reference{$key};
             my $model_isize_count = defined $model{$key} ? $model{$key} : "0.000000000001";
             ## Add the pop and model count of each insert size to the matrix by col.
-            $R->run("ref_count   = c( ref_count,   $pop_isize_count   )");
+            $R->run("ref_count   = c( ref_count,   $LIB_isize_count   )");
             $R->run("model_count = c( model_count, $model_isize_count )");
         }
         $R->run('counts=data.frame(model_count,ref_count)');
@@ -229,13 +230,6 @@ foreach my $number_of_reads (@reads_number_to_process) {
     &print_summary_stats( $TXT, "JSD_ci-max", \@jsd_ci_max_values );
     close $TXT;
 }
-
-# if ( defined $options{lgt_ref} and -e $options{lgt_ref} ) {
-#     run_cmd("rm $lgt_ref1 $lgt_ref2");
-# }
-# else {
-#     run_cmd("rm $generated_ref");
-# }
 
 print_complete( \%options );
 
@@ -435,7 +429,7 @@ GENERATE_BAM: run_cmd("picard DownsampleSam I=$big_bam O=$dir/downsampled.bam R=
 }
 
 sub help {
-    die "   This script will take a INT reference and generate [--reads=] number of reads with the given library insert size and distribution.
+    die "   This script will take a reference and generate [--reads=] number of reads with the given library insert size and distribution.
     Using these random reads, the optimal Jenson-Shannon Distance will be calculated.
     This process is repeated [--iterate] number of times to access the best possible JSD for [--reads] number of reads.
         --input|P=              Picard insert metrics for the original and entire library

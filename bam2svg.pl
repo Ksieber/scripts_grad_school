@@ -135,20 +135,20 @@ for my $pair (@pairs) {
             $color = 'white';
         }
         elsif ( abs($variance) <= ( .5 * $stdev ) ) {
-            $color = '255,175,175' if $variance < 0;			## Red
-            $color = '200,255,200' if $variance > 0;			## Green
+            $color = '255,175,175' if $variance < 0;    ## Red
+            $color = '200,255,200' if $variance > 0;    ## Green
         }
         elsif ( abs($variance) <= $stdev ) {
-            $color = '255,20,20' if $variance < 0;			## Red
-            $color = '115,255,115' if $variance > 0;			## Green
+            $color = '255,20,20'   if $variance < 0;    ## Red
+            $color = '115,255,115' if $variance > 0;    ## Green
         }
         elsif ( abs($variance) <= ( 2 * $stdev ) ) {
-            $color = '185,0,0' if $variance <= 0;			## Red
-            $color = '0,165,0' if $variance > 0;			## Green
+            $color = '185,0,0' if $variance <= 0;       ## Red
+            $color = '0,165,0' if $variance > 0;        ## Green
         }
         elsif ( abs($variance) > ( 2 * $stdev ) ) {
-            $color = '100,0,0' if $variance <= 0;			## Red
-            $color = '0,75,0' if $variance > 0;			## Green
+            $color = '100,0,0' if $variance <= 0;       ## Red
+            $color = '0,75,0'  if $variance > 0;        ## Green
         }
 
         # print STDERR "Color: $color\n";

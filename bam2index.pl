@@ -7,7 +7,7 @@ use run_cmd;
 use POSIX;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 my %options;
-my $results = GetOptions( \%options, 'input=s', 'threads=s', 'output_prefix=s', 'output_dir=s', 'Qsub=s', 'sort_mem=s', 'sub_mem=s', 'sub_mail=s', 'help|?', );
+my $results = GetOptions( \%options, 'input|i=s', 'threads=s', 'output_prefix=s', 'output_dir=s', 'Qsub=s', 'sort_mem=s', 'sub_mem=s', 'sub_mail=s', 'help|?', );
 
 if ( $options{help} ) {
     die "Help: This script will take a bam to sort and index it.

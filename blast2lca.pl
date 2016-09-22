@@ -1,4 +1,4 @@
-#!/usr/bin/perl -I /home/ksieber/perl5/lib/perl5/ -I /home/ksieber/scripts/
+#!/usr/bin/perl
 
 =head1 NAME
 
@@ -21,7 +21,12 @@ The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with "_"
 
 =cut
-
+use lib ( 
+  '/home/ksieber/perl5/lib/perl5/', 
+  '/home/ksieber/scripts/', 
+  '/local/projects-t3/HLGT/scripts/lgtseek/lib/',
+  '/local/projects/ergatis/package-driley/lib/perl5/x86_64-linux-thread-multi/'
+  );
 use warnings;
 use strict;
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
@@ -49,7 +54,6 @@ my $results = GetOptions(
     'help|?',
 ) or die "Error: Unrecognized command line option. Please try again.\n";
 
-use lib ( '/home/ksieber/scripts/', '/home/ksieber/perl5/lib/perl5/', '/local/projects-t3/HLGT/scripts/lgtseek/lib/', '/local/projects/ergatis/package-driley/lib/perl5/x86_64-linux-thread-multi/' );
 use print_call;
 print_hostname( \%options );    ## This is useful for trouble shooting grid nodes that might be missing modules for LGTSeek etc.
 

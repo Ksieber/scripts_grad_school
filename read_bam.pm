@@ -1,4 +1,5 @@
 package read_bam;
+use lib ( '/home/ksieber/scripts/', '/home/ksieber/perl5/lib/perl5/' );
 use warnings;
 use strict;
 use Carp;
@@ -12,9 +13,9 @@ our @EXPORT = qw( open_bam read_bam write_bam );
 
     Title   :   open_bam
     Usage1   :   my ($header,$fh) = open_bam('/path/to/some.bam','chr:1-100');
-    Usage2   :   my $fh = open_bam('/path/to/some.bam');
+    Usage2   :   my $fh = open_bam('/path/to/some.bam','chr:1-100');
     Function:   Open filehandle to a bam
-    Returns :   (bam-header, bam-filehandle)
+    Returns :   (bam-header-string, bam-filehandle)
     Args    :   First arg MUST be a bam
                 Second arg may be a region, must be chr:1-100 format.
 =cut

@@ -1,4 +1,5 @@
-#!/usr/bin/perl -I /home/ksieber/scripts/ -I /home/ksieber/perl5/lib/perl5/
+#!/usr/bin/perl
+use lib ( '/home/ksieber/scripts/', '/home/ksieber/perl5/lib/perl5/', '/local/projects-t3/HLGT/scripts/lgtseek/lib/' );
 use strict;
 use warnings;
 use Time::SoFar;
@@ -7,7 +8,6 @@ use LGTSeek;
 use run_cmd;
 use mk_dir;
 use setup_input;
-use lib '/local/projects-t3/HLGT/scripts/lgtseek/lib/';
 use Getopt::Long qw(:config no_ignore_case no_auto_abbrev);
 our %options;
 our $results = GetOptions( \%options, 'input|i=s', 'input_list|I=s', 'output_dir|o=s', 'subdirs=s', 'append=s', 'Qsub|q=s', 'sub_mem=s', 'sub_wd=s', 'help|?' )
