@@ -22,9 +22,9 @@ The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with a _
 
 =cut
-use lib ( '/home/ksieber/scripts/', '/home/ksieber/perl5/lib/perl5/' );
 use warnings;
 use strict;
+use local::lib;
 use Scalar::Util qw(reftype);
 use File::Basename;
 use POSIX;

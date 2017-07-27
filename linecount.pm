@@ -57,7 +57,7 @@ sub wc {
             close HEADER;
 
             # Adjust the new header
-            run_cmd("samtools reheader $path\/tmp_$random_int\.header $path\/tmp_bam_for_counting_$random_int\.bam > $file");
+            run_cmd("samtools reheader -P $path\/tmp_$random_int\.header $path\/tmp_bam_for_counting_$random_int\.bam > $file");
 
             # Cleanup intermediate files
             run_cmd("rm $path\/tmp_bam_for_counting_$random_int.bam $path\/tmp_$random_int.header");

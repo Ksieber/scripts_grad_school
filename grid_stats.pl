@@ -35,8 +35,8 @@ if ( defined $ARGV[0] and ( $ARGV[0] =~ /\-{0,2}[?hH]{1}/ or $ARGV[0] =~ /help/i
 }
 
 my $users_to_ignore = "";
-if ( defined @ARGV ) {
-    foreach my $user (@ARGV) {
+if ( defined $ARGV ) {
+    foreach my $user (@$ARGV) {
         $users_to_ignore = $users_to_ignore . " | grep -v \"$user\"";
     }
 }

@@ -66,8 +66,8 @@ sub hash_in_data {
 
     my %ret;
     open( IN, "<", "$file" ) or confess "Error: Not able to open the list file: $file\n";
-    while (<IN>) {
-        chomp( my $line = $_ );
+    while ( my $line = <IN> ) {
+        chomp($line);
         my @split_line = split( /\t/, $line );
         if ( defined $split_line[0] ) { $split_line[0] =~ s/(\s+)$//; }
         if ( defined $split_line[1] ) { $split_line[1] =~ s/(\s+)$//; }

@@ -58,12 +58,13 @@ sub open_bam {
 =cut
 
 sub read_bam {
-    my $FH         = shift;
+    my $FH         = $_[0];
     my $parse_flag = shift;
     my $line       = <$FH>;
     if ( !$line ) { close $FH; return undef; }
     chomp($line);
-    my ( $id, $flag, $chr, $position, $mapq, $cigar, $mate_ref, $mate_position, $insert, $sequence, $qual ) = ( split /\t/, $line )[ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 ];
+    my ( $id, $flag, $chr, $position, $mapq, $cigar, $mate_ref, $mate_position, $insert, $sequence, $qual )
+        = ( split /\t/, $line )[ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 ];
     $id =~ s/(.+)\/\d+/$1/;
     my $converted_flag = ( defined $parse_flag and $parse_flag == 0 ) ? $flag : parse_flag($flag);
     return {

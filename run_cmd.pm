@@ -1,9 +1,11 @@
 package run_cmd;
-use lib ( '/home/ksieber/scripts/', '/home/ksieber/perl5/lib/perl5/' );
+use lib('/home/kbs14104/scripts/grad_school/');
 use warnings;
 no warnings 'uninitialized';
 use strict;
+use Data::Dumper;
 use File::Basename;
+use File::HomeDir;
 use Carp;
 $Carp::MaxArgLen = 0;    ## Report full length error
 use Exporter;
@@ -41,12 +43,12 @@ sub run_cmd {
 
     if ( -e $log ) { print $fh "CMD: $cmd\n"; }
     chomp( my $res = `$cmd` );
-    if ($?) {
+    if ( $? == -1 ) {
         print STDERR "FAIL_CMD: $cmd died with message: $res\n";
         print STDERR "Pausing 30s and trying to run the cmd again.\n";
         sleep 30;
         chomp( $res = `$cmd` );
-        if ($?) {
+        if ( $? == -1 ) {
             confess "FAIL_CMD: $cmd died again with message: $res\n";
         }
     }
@@ -113,7 +115,8 @@ sub Qsub {
                     --threads=i
                     --sub_mem=s
                     --sub_name=s
-                    --sub_mail=s | if sub_mail=1 defaults to username\@som.umaryland.edu else it mails to specified sub_mail=Whatever@email.foo
+                    --sub_que=s
+                    --sub_mail=s | if sub_mail=1 defaults to conf_email else it mails to specified sub_mail=Whatever@email.foo
                     --project=s
                     --wd=s
                     --cwd=i
@@ -124,27 +127,32 @@ sub Qsub {
 sub Qsub_script {
     my $options = $_[0] || confess "Error: &Qsub_script didn't receive a hash ref properly: $!\n";
     if ( ref($options) ne "HASH" ) { confess "Error: &Qsub_script didn't receive a hash ref properly: $!\n"; }
+    my $default = &read_RunCmdConfig();
 
     ## Setup Qsub command:
     my $opts;
 
     # $opts->{wd}= defined $options->{wd} ? " -wd $options->{wd}" : undef;
     $opts->{threads} = undef;
-    my $t = defined $options->{threads} ? $options->{threads} : 1;
-    if ( $t >= 2 ) { $opts->{threads} = " -pe thread $t -q threaded.q"; }
-    $opts->{sub_mem}  = defined $options->{sub_mem}  ? " -l mf=$options->{sub_mem}"            : " -l mf=1G";
-    $opts->{project}  = defined $options->{project}  ? " -P $options->{project}"               : " -P jdhotopp-lab";
+    my $t               = defined $options->{threads}   ? $options->{threads}        : 1;
+    my $parallel_enviro = defined $options->{sub_PE}    ? $options->{sub_PE}         : $default->{sub_PE};
+    my $queue           = defined $options->{sub_queue} ? "-q $options->{sub_queue}" : undef;
+    if ( $t >= 2 ) { $opts->{threads} = " -pe $parallel_enviro $t $queue"; }
+    elsif ( $t < 2 and !defined $queue ) { $opts->{threads} = " -q $default->{sub_queue}"; }
+    $opts->{sub_mem} = defined $options->{sub_mem} ? " -l mf=$options->{sub_mem}" : " -l mf=1G";
+    $opts->{project} = defined $options->{project} ? " -P $options->{project}"    : undef;
+    if ( !defined $opts->{project} and defined $default->{project} ) { $opts->{project} = " -P $default->{project}"; }
     $opts->{cwd}      = defined $options->{cwd}      ? " -cwd"                                 : undef;
     $opts->{sub_name} = defined $options->{sub_name} ? " -N $options->{sub_name}"              : undef;
     $opts->{hostname} = defined $options->{hostname} ? " -l hostname=\"$options->{hostname}\"" : undef;
     undef $opts->{exclusive};
     if ( $options->{excl} ) { $opts->{exclusive} = " -l excl=true"; }
     else                    { undef $opts->{exclusive}; }
-    ## SGE mail; if sub_mail=1 defaults to username\@som.umaryland.edu else it mails to specified sub_mail=Whatever@email.foo
+    ## SGE mail; if sub_mail=1 defaults to conf_email else it mails to specified sub_mail=Whatever@email.foo
     chomp( my $user_name = `whoami` );
-    if    ( $options->{sub_mail} =~ /\w+\.\w{3}/ ) { $opts->{sub_mail} = " -M $options->{sub_mail} -m aes"; }
-    elsif ( $options->{sub_mail} == 1 )            { $opts->{sub_mail} = " -M $user_name\@som.umaryland.edu -m aes"; }
-    else                                           { $opts->{sub_mail} = undef; }
+    if    ( $options->{sub_mail} =~ /\w+\.\w{2,}/ ) { $opts->{sub_mail} = " -M $options->{sub_mail} -m aes"; }
+    elsif ( $options->{sub_mail} == 1 )             { $opts->{sub_mail} = " -M $default->{sub_mail} -m aes"; }
+    else                                            { $opts->{sub_mail} = undef; }
     my $sleep = $options->{sub_sleep} ? $options->{sub_sleep} : ".5";
 
     my $qsub = "qsub -V";
@@ -241,7 +249,8 @@ sub Qsub_script {
         print STDERR "QSUB: $report\n\n";
         sleep $sleep;
     }
-    die "+++ Finished submiting all jobs for: $0 +++\n";
+    print STDERR "+++ Finished submiting all jobs for: $0 +++\n";
+    exit;
 }
 
 =head2 _Qsub_cmd 
@@ -254,6 +263,7 @@ sub Qsub_script {
 sub _Qsub_cmd {
     my ( $cmd, $log ) = @_;
     my $fh;
+    my $default = &read_RunCmdConfig();
     if ($log) {
         open( $fh, ">>", "$log" ) or confess "Can't open: $fh because: $!\n";
     }
@@ -262,11 +272,12 @@ sub _Qsub_cmd {
     }
     print $fh "Going to qsub: $cmd\n";
     my $qsub;
+    my $project = defined $default->{project} ? " -P $default->{project}" : undef;
     if ( $cmd =~ /\.sh$/ ) {
-        $qsub = "qsub -V -P jdhotopp-lab -l mf=1G $cmd";
+        $qsub = "qsub -V$project -l mf=1G $cmd";
     }
     else {
-        $qsub = "echo \"$cmd\" | qsub -V -P jdhotopp-lab -l mf=1G";
+        $qsub = "echo \"$cmd\" | qsub -V$project -l mf=1G";
     }
     chomp( my $report = `$qsub` );
     if ($?) {
@@ -279,7 +290,7 @@ sub _Qsub_cmd {
 =head2 _Qsub_opt 
     ** private**
     Title       :  _Qsub_opt
-    Usage       :  _Qsub({ cmd => $cmd, threads => $threads });
+    Usage       :  Qsub({ cmd => $cmd, threads => $threads });
     Function    :  qsub a command with advanced options 
     Args    :
         cmd         => command/shell script to be qsub'ed
@@ -297,14 +308,19 @@ sub _Qsub_cmd {
 sub _Qsub_opt {
     my $config = $_[0];
     if ( !$config->{cmd} ) { confess "Must use cmd => <Command to qsub>. Please Fix.\n"; }
-    my $cmd     = $config->{cmd};
-    my $log     = $config->{log};
-    my $wd      = defined $config->{wd} ? " -wd $config->{wd}" : undef;
-    my $threads = undef;
-    my $t       = defined $config->{threads} ? $config->{threads} : 1;
-    if ( $t >= 2 ) { $threads = " -pe thread $t -q threaded.q"; }
-    my $mem      = defined $config->{sub_mem}  ? " -l mf=$config->{sub_mem}"            : " -l mf=1G";
-    my $project  = defined $config->{project}  ? " -P $config->{project}"               : " -P jdhotopp-lab";
+    my $cmd             = $config->{cmd};
+    my $default         = &read_RunCmdConfig();
+    my $log             = $config->{log};
+    my $wd              = defined $config->{wd} ? " -wd $config->{wd}" : undef;
+    my $threads         = undef;
+    my $t               = defined $config->{threads} ? $config->{threads} : 1;
+    my $parallel_enviro = defined $config->{sub_PE} ? $config->{sub_PE} : $default->{sub_PE};
+    my $queue           = defined $config->{sub_queue} ? " -q $config->{sub_queue}" : " -q $default->{sub_queue}";
+    if   ( $t >= 2 ) { $threads = " -pe $parallel_enviro $t $queue"; }
+    else             { $threads = $queue; }
+    my $mem     = defined $config->{sub_mem} ? " -l mf=$config->{sub_mem}" : " -l mf=1G";
+    my $project = defined $config->{project} ? " -P $config->{project}"    : undef;
+    if ( !defined $config->{project} and defined $default->{project} ) { $project = "-P $default->{project}"; }
     my $cwd      = defined $config->{cwd}      ? " -cwd"                                : undef;
     my $sub_name = defined $config->{sub_name} ? " -N $config->{sub_name}"              : undef;
     my $hostname = defined $config->{hostname} ? " -l hostname=\"$config->{hostname}\"" : undef;
@@ -314,11 +330,11 @@ sub _Qsub_opt {
     my $fh;
     my $sleep = $config->{sub_sleep} ? $config->{sub_sleep} : ".5";
 
-    ## SGE mail; if sub_mail=1 defaults to username\@som.umaryland.edu else it mails to specified sub_mail=Whatever@email.foo
+    ## SGE mail; if sub_mail=1 defaults to username\@runcmdconfig.txt else it mails to specified sub_mail=Whatever@email.foo
     chomp( my $user_name = `whoami` );
     my $sub_mail;
     if    ( defined $config->{sub_mail} and $config->{sub_mail} =~ /\w+\@\w+\.\w{3}/ ) { $sub_mail = " -M $config->{sub_mail} -m aes"; }
-    elsif ( defined $config->{sub_mail} and $config->{sub_mail} == 1 )                 { $sub_mail = " -M $user_name\@som.umaryland.edu -m aes"; }
+    elsif ( defined $config->{sub_mail} and $config->{sub_mail} == 1 )                 { $sub_mail = " -M $default->{sub_mail} -m aes"; }
     else                                                                               { undef $sub_mail; }
 
     if ($log) {
@@ -359,6 +375,28 @@ sub find_files {
     my @files        = split( /\n/, $files_string );
     foreach my $file (@files) { chomp($file); }
     return @files;
+}
+
+sub read_RunCmdConfig {
+    my $conf_file = File::HomeDir->my_home . "/.run_cmd.conf";
+    if ( -e $conf_file ) {
+        my %default;
+        open( my $CONF, "<", $conf_file ) or confess "Can't open conf_file: $conf_file\n";
+        while ( my $line = <$CONF> ) {
+            chomp($line);
+            next if ( $line =~ /^#/ );
+            $line =~ /(\w+)\s+([A-Za-z0-9-._\/: \,\@]+)/;
+            my ( $key, $value ) = ( $1, $2 );
+            $key =~ s/\s+$//g;
+            $value =~ s/\s+$//g;
+            $default{$key} = $value;
+        }
+        close $CONF or confess "*** Error *** can't close conf_file: $conf_file\n";
+        return \%default;
+    }
+    else {
+        die "Error: Please create a \$HOME/\/.run_cmd.conf\n";
+    }
 }
 
 1;
